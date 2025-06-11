@@ -297,7 +297,7 @@ func PortScanner(target string, ports []int, timeout time.Duration) {
 }
 
 // HTML EAD ANALYZER
-func HeaderAnalyzer(target string) map[string]string {
+func HeaderAnalyzer(target string) {
 	results := make(map[string]string)
 
 	// Ensure scheme is there
@@ -312,13 +312,13 @@ func HeaderAnalyzer(target string) map[string]string {
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
 		results["error"] = "invalid request"
-		return results
+		print(results)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		results["error"] = "connection failed"
-		return results
+		print(results)
 	}
 	defer resp.Body.Close()
 
@@ -337,8 +337,8 @@ func HeaderAnalyzer(target string) map[string]string {
 	results["Status"] = resp.Status
 
 	fmt.Println("📡 Header Scan Results:")
-	for k, v := range headers {
+	for k, v := range results {
 		fmt.Printf(" - %s: %s\n", k, v)
-	}s
-	
+	}
+
 }
