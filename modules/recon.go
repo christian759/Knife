@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/likexian/whois"
@@ -229,4 +230,115 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 	for _, email := range emails {
 		fmt.Println(" -", email)
 	}
+}
+
+// PORT SCANNER
+func PortScanner(target string, ports []int, timeout time.Duration) {
+	results := make(map[string]string)
+	portsChan := make(chan int, 100)
+	resultsChan := make(chan struct {
+		Port   int
+		Banner string
+	}, 100)
+
+	// Start workers
+	for i := 0; i < 100; i++ {
+		go func() {
+			for port := range portsChan {
+				var address string
+				if strings.Contains(target, ":") && !strings.HasPrefix(target, "[") {
+					address = fmt.Sprintf("[%s]:%d", target, port)
+				} else {
+					address = fmt.Sprintf("%s:%d", target, port)
+				}
+				conn, err := net.DialTimeout("tcp", address, timeout)
+				if err != nil {
+					continue
+				}
+
+				_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+				buff := make([]byte, 1024)
+				n, _ := conn.Read(buff)
+				banner := strings.TrimSpace(string(buff[:n]))
+				if banner == "" {
+					banner = "open"
+				}
+				_ = conn.Close()
+				resultsChan <- struct {
+					Port   int
+					Banner string
+				}{port, banner}
+			}
+		}()
+	}
+
+	// Feed ports
+	go func() {
+		for _, port := range ports {
+			portsChan <- port
+		}
+		close(portsChan)
+	}()
+
+	// Collect results
+	for range ports {
+		select {
+		case r := <-resultsChan:
+			results[fmt.Sprintf("tcp/%d", r.Port)] = r.Banner
+		case <-time.After(timeout + 1*time.Second):
+			// Skip timeout ports
+		}
+	}
+
+	fmt.Println("✅ Results:")
+	for port, banner := range results {
+		fmt.Printf(" - %s: %s\n", port, banner)
+	}
+}
+
+// HTML EAD ANALYZER
+func HeaderAnalyzer(target string) map[string]string {
+	results := make(map[string]string)
+
+	// Ensure scheme is there
+	if !strings.HasPrefix(target, "http") {
+		target = "http://" + target
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", target, nil)
+	if err != nil {
+		results["error"] = "invalid request"
+		return results
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		results["error"] = "connection failed"
+		return results
+	}
+	defer resp.Body.Close()
+
+	for k, v := range resp.Header {
+		key := strings.ToLower(k)
+
+		// Only extract juicy headers
+		switch key {
+		case "server", "x-powered-by", "set-cookie", "content-type",
+			"strict-transport-security", "content-security-policy",
+			"x-frame-options", "x-xss-protection", "x-content-type-options":
+			results[k] = strings.Join(v, "; ")
+		}
+	}
+
+	results["Status"] = resp.Status
+
+	fmt.Println("📡 Header Scan Results:")
+	for k, v := range headers {
+		fmt.Printf(" - %s: %s\n", k, v)
+	}s
+	
 }
