@@ -2,12 +2,15 @@ package modules
 
 import (
 	"fmt"
+	"knife/util"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/gocolly/colly"
+	"github.com/likexian/whois"
 )
 
 var socialsite = map[string]string{
@@ -38,8 +41,14 @@ func search_user(user string) {
 }
 
 // presently it only support google and duckduckgo
-func dorksearching(word string, websites []string, strict bool, engine string) map[string]string {
+func dork_searching(word string, websites []string, strict bool, engine string) map[string]string {
 	results := make(map[string]string)
+
+	if websites == nil {
+		for name, _ := range socialsite {
+			websites = append(websites, name)
+		}
+	}
 
 	for _, site := range websites {
 		// Build the query
@@ -92,5 +101,78 @@ func dorksearching(word string, websites []string, strict bool, engine string) m
 	}
 
 	return results
+}
 
+// WHOIS RECON
+func lookupWhois(website string) {
+	result, _ := whois.Whois(website)
+	fmt.Println(result)
+}
+
+// DNS RECON
+type DNSRecord struct {
+	A           []string
+	AAAA        []string
+	MX          []string
+	NS          []string
+	TXT         []string
+	CNAME       string
+	HasWildcard bool
+}
+
+func DNSRecon(domain string) {
+	var result DNSRecord
+
+	// A
+	if ips, err := net.LookupHost(domain); err == nil {
+		result.A = ips
+	}
+
+	// AAAA
+	if ips, err := net.LookupIP(domain); err == nil {
+		for _, ip := range ips {
+			if ip.To4() == nil {
+				result.AAAA = append(result.AAAA, ip.String())
+			}
+		}
+	}
+
+	// MX
+	if mxRecords, err := net.LookupMX(domain); err == nil {
+		for _, mx := range mxRecords {
+			result.MX = append(result.MX, fmt.Sprintf("%s (%d)", mx.Host, mx.Pref))
+		}
+	}
+
+	// NS
+	if ns, err := net.LookupNS(domain); err == nil {
+		for _, n := range ns {
+			result.NS = append(result.NS, n.Host)
+		}
+	}
+
+	// TXT
+	if txts, err := net.LookupTXT(domain); err == nil {
+		result.TXT = txts
+	}
+
+	// CNAME
+	if cname, err := net.LookupCNAME(domain); err == nil && !strings.EqualFold(cname, domain+".") {
+		result.CNAME = cname
+	}
+
+	// Wildcard test (resolve a likely non-existent subdomain)
+	wildTest := "unlikely-" + util.RandString(10) + "." + domain
+	if wildcardIPs, err := net.LookupHost(wildTest); err == nil && len(wildcardIPs) > 0 {
+		result.HasWildcard = true
+	}
+
+	fmt.Println("== DNS Records ==")
+	fmt.Println("A:", result.A)
+	fmt.Println("AAAA:", result.AAAA)
+	fmt.Println("MX:", result.MX)
+	fmt.Println("NS:", result.NS)
+	fmt.Println("TXT:", result.TXT)
+	fmt.Println("CNAME:", result.CNAME)
+	fmt.Println("Wildcard DNS Detected:", result.HasWildcard)
 }
