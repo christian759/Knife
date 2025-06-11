@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/gocolly/colly"
@@ -175,4 +176,57 @@ func DNSRecon(domain string) {
 	fmt.Println("TXT:", result.TXT)
 	fmt.Println("CNAME:", result.CNAME)
 	fmt.Println("Wildcard DNS Detected:", result.HasWildcard)
+}
+
+// EMAIL HUNTER
+func EmailHunter(domain string, maxDepth int, strict bool) {
+	emailSet := make(map[string]struct{})
+
+	c := colly.NewCollector(
+		colly.MaxDepth(maxDepth),
+		colly.AllowedDomains(domain, "www."+domain),
+	)
+
+	// Regex for emails
+	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@` + regexp.QuoteMeta(domain))
+
+	// On every HTML page
+	c.OnHTML("body", func(e *colly.HTMLElement) {
+		matches := emailRegex.FindAllString(e.Text, -1)
+		for _, email := range matches {
+			email = strings.ToLower(email)
+			emailSet[email] = struct{}{}
+		}
+	})
+
+	// On links (to follow internal pages)
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if strings.Contains(link, domain) {
+			_ = c.Visit(link)
+		}
+	})
+
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Printf("Error: %s (%d)\n", r.Request.URL, r.StatusCode)
+	})
+
+	startURL := "https://" + domain
+	err := c.Visit(startURL)
+	if err != nil {
+		panic(err)
+	}
+
+	// Convert map to slice
+	var emails []string
+	for email := range emailSet {
+		if !strict || strings.HasSuffix(email, "@"+domain) {
+			emails = append(emails, email)
+		}
+	}
+
+	fmt.Println("📬 Emails found:")
+	for _, email := range emails {
+		fmt.Println(" -", email)
+	}
 }
