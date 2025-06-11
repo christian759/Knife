@@ -10,6 +10,7 @@ import (
 
 var width int
 
+// getting terminal size
 func getTerminalSize() (int, int, error) {
 	cmd := exec.Command("stty", "size")
 	cmd.Stdin = os.Stdin
@@ -32,6 +33,7 @@ func getTerminalSize() (int, int, error) {
 	return width, height, nil
 }
 
+// printing the bold title(knife)
 func printAsciiArtAlign(sentences []string, textFile []string, position string, w int) {
 	for i, word := range sentences {
 		if word == "" {
