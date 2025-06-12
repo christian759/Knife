@@ -11,8 +11,9 @@ import (
 )
 
 func Launch(templateName string, port int) {
-	templatePath := filepath.Join("modules", "phishing", "templates", templateName)
+	templatePath := filepath.Join("modules", "phish", "templates", templateName)
 	indexFile := filepath.Join(templatePath, "index.html")
+	print(indexFile)
 
 	if _, err := os.Stat(indexFile); os.IsNotExist(err) {
 		fmt.Printf("[!] Template '%s' does not exist.\n", templateName)
