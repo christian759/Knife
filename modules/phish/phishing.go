@@ -1,4 +1,4 @@
-package phishing
+package phish
 
 import (
 	"fmt"

@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"knife/modules/phish"
 )
 
 var width int
@@ -119,4 +121,10 @@ func main() {
 
 	lines := strings.Split(string(file), "\n")
 	printAsciiArtAlign(sepArgs, lines, "center", width)
+
+	if len(os.Args) >= 4 && os.Args[1] == "phish" {
+		template := os.Args[2]
+		port, _ := strconv.Atoi(os.Args[3])
+		phish.Launch(template, port)
+	}
 }
