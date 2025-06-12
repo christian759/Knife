@@ -1,0 +1,25 @@
+body {
+  background: #f3f2f1;
+  font-family: Segoe UI, sans-serif;
+}
+
+.box {
+  width: 300px;
+  margin: 100px auto;
+  background: white;
+  padding: 30px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+input, button {
+  width: 100%;
+  padding: 10px;
+  margin: 12px 0;
+}
+
+button {
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 3px;
+}
