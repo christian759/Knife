@@ -136,8 +136,6 @@ func displayModule() string {
 		if index == moduleIntNo-1 {
 			selectedModule = modules[moduleIntNo]
 			return value
-		} else {
-			return "number is not in range"
 		}
 	}
 	return "/n"
