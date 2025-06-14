@@ -174,15 +174,66 @@ func displayModule() string {
 }
 
 func mobileModule() string {
-	return ""
+	for index, module := range trickMobile {
+		fmt.Printf("[%d] %s\n", index+1, module)
+	}
+
+	// Take input
+	var moduleIntNo int
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleIntNo)
+
+	// Validate input
+	if moduleIntNo < 1 || moduleIntNo > len(trickMobile) {
+		fmt.Println("Choice out of range")
+		return ""
+	}
+
+	// Set selected module
+	selectedModule = modules[moduleIntNo-1]
+	return selectedModule
 }
 
 func phishModule() string {
-	return ""
+	for index, module := range trickPhishTemp {
+		fmt.Printf("[%d] %s\n", index+1, module)
+	}
+
+	// Take input
+	var moduleIntNo int
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleIntNo)
+
+	// Validate input
+	if moduleIntNo < 1 || moduleIntNo > len(trickPhishTemp) {
+		fmt.Println("Choice out of range")
+		return ""
+	}
+
+	// Set selected module
+	selectedModule = modules[moduleIntNo-1]
+	return selectedModule
 }
 
 func reconModule() string {
-	return ""
+	for index, module := range trickRecon {
+		fmt.Printf("[%d] %s\n", index+1, module)
+	}
+
+	// Take input
+	var moduleIntNo int
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleIntNo)
+
+	// Validate input
+	if moduleIntNo < 1 || moduleIntNo > len(trickRecon) {
+		fmt.Println("Choice out of range")
+		return ""
+	}
+
+	// Set selected module
+	selectedModule = modules[moduleIntNo-1]
+	return selectedModule
 }
 
 func vulnModule() string {
@@ -190,7 +241,24 @@ func vulnModule() string {
 }
 
 func wifiModule() string {
-	return ""
+	for index, module := range trickWifi {
+		fmt.Printf("[%d] %s\n", index+1, module)
+	}
+
+	// Take input
+	var moduleIntNo int
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleIntNo)
+
+	// Validate input
+	if moduleIntNo < 1 || moduleIntNo > len(trickWifi) {
+		fmt.Println("Choice out of range")
+		return ""
+	}
+
+	// Set selected module
+	selectedModule = modules[moduleIntNo-1]
+	return selectedModule
 }
 
 func main() {
