@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"knife/modules/vuln"
+	"knife/modules/mobile"
 )
 
 var width int
@@ -122,8 +122,7 @@ func main() {
 	lines := strings.Split(string(file), "\n")
 	printAsciiArtAlign(sepArgs, lines, "center", width)
 
-	// testing the vuln module
-
+	// testing the phishing module
 	/*
 		if len(os.Args) >= 4 && os.Args[1] == "phish" {
 			template := os.Args[2]
@@ -131,5 +130,12 @@ func main() {
 			phish.Launch(template, port)
 		}
 	*/
-	vuln.ScanURL("https://unilorin.edu.ng")
+
+	// testing the vuln scanner movule (doesnt seem to be to through)
+	/*
+		vuln.ScanURL("https://unilorin.edu.ng")
+	*/
+
+	//testing the apk module
+	mobile.ParseAPKMeat("/home/christian/archive/codemine/codemine.apk")
 }

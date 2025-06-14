@@ -3,11 +3,11 @@
 package mobile
 
 import (
-	"exec"
 	"fmt"
+	"os/exec"
 )
 
-func parseAPKMeat(apkPath string) {
+func ParseAPKMeat(apkPath string) {
 	cmd := exec.Command("aapt", "dump", "badging", apkPath)
 	out, _ := cmd.CombinedOutput()
 	fmt.Println(string(out))
