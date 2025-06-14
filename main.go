@@ -10,6 +10,18 @@ import (
 
 var width int
 
+var modules = []string{
+	"mobile attack",
+	"phishing",
+	"reconnaissance",
+	"web vulnerability",
+	"wifi attack",
+}
+
+var moduleNo string
+
+var selectedModule string
+
 // getting terminal size
 func getTerminalSize() (int, int, error) {
 	cmd := exec.Command("stty", "size")
@@ -106,6 +118,31 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 	}
 }
 
+func displayModule() string {
+	for index, module := range modules {
+		fmt.Printf("[%d] %s \n", index+1, module)
+	}
+	// taking input
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleNo)
+
+	moduleIntNo, err := strconv.Atoi(moduleNo)
+	if err != nil {
+		fmt.Printf("could not convert '%s' to type string \n", moduleNo)
+		return ""
+	}
+
+	for index, value := range modules {
+		if index == moduleIntNo-1 {
+			selectedModule = modules[moduleIntNo]
+			return value
+		} else {
+			return "number is not in range"
+		}
+	}
+	return "/n"
+}
+
 func main() {
 	argStr := "Go-Knife"
 	sepArgs := strings.Split(argStr, "\\n")
@@ -118,8 +155,10 @@ func main() {
 	}
 
 	lines := strings.Split(string(file), "\n")
-	printAsciiArtAlign(sepArgs, lines, "center", width)
+	printAsciiArtAlign(sepArgs, lines, "left", width)
 
+	selectedModule = displayModule()
+	println(selectedModule)
 	// testing the phishing module
 	/*
 		if len(os.Args) >= 4 && os.Args[1] == "phish" {
