@@ -18,8 +18,6 @@ var modules = []string{
 	"wifi attack",
 }
 
-var moduleNo string
-
 var selectedModule string
 
 // getting terminal size
@@ -120,25 +118,23 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 
 func displayModule() string {
 	for index, module := range modules {
-		fmt.Printf("[%d] %s \n", index+1, module)
+		fmt.Printf("[%d] %s\n", index+1, module)
 	}
-	// taking input
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleNo)
 
-	moduleIntNo, err := strconv.Atoi(moduleNo)
-	if err != nil {
-		fmt.Printf("could not convert '%s' to type string \n", moduleNo)
+	// Take input
+	var moduleIntNo int
+	fmt.Print("Select the number: ")
+	fmt.Scan(&moduleIntNo)
+
+	// Validate input
+	if moduleIntNo < 1 || moduleIntNo > len(modules) {
+		fmt.Println("Choice out of range")
 		return ""
 	}
 
-	for index, value := range modules {
-		if index == moduleIntNo-1 {
-			selectedModule = modules[moduleIntNo]
-			return value
-		}
-	}
-	return "/n"
+	// Set selected module
+	selectedModule = modules[moduleIntNo-1]
+	return selectedModule
 }
 
 func mobileModule() string {
