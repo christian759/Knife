@@ -143,6 +143,26 @@ func displayModule() string {
 	return "/n"
 }
 
+func mobileModule() string {
+	return ""
+}
+
+func phishModule() string {
+	return ""
+}
+
+func reconModule() string {
+	return ""
+}
+
+func vulnModule() string {
+	return ""
+}
+
+func wifiModule() string {
+	return ""
+}
+
 func main() {
 	argStr := "Go-Knife"
 	sepArgs := strings.Split(argStr, "\\n")
@@ -159,6 +179,28 @@ func main() {
 
 	selectedModule = displayModule()
 	println(selectedModule)
+
+	switch selectedModule {
+
+	case "mobile attack":
+		mobileModule()
+
+	case "phishing":
+		phishModule()
+
+	case "reconnaissance":
+		reconModule()
+
+	case "web vulnerability":
+		vulnModule()
+
+	case "wifi attack":
+		wifiModule()
+
+	default:
+		os.Exit(0)
+	}
+
 	// testing the phishing module
 	/*
 		if len(os.Args) >= 4 && os.Args[1] == "phish" {
