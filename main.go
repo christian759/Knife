@@ -131,5 +131,5 @@ func main() {
 			phish.Launch(template, port)
 		}
 	*/
-	vuln.ScanURL("https://edu.sqi.ng")
+	vuln.ScanURL("https://unilorin.edu.ng")
 }

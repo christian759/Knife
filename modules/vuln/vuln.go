@@ -88,5 +88,5 @@ func ScanURL(target string) {
 			fmt.Printf("[!] Potential %s detected with param '%s' using %s method → %s\n", check.Name, check.Param, check.Method, testURL)
 		}
 	}
-	fmt.Println("[+] Full scan complete.")
+	fmt.Println("[+] Full scan complete, no vulnerability found.")
 }
