@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-
-	"knife/modules/mobile"
 )
 
 var width int
@@ -137,5 +135,7 @@ func main() {
 	*/
 
 	//testing the apk module
-	mobile.ParseAPKMeat("/home/christian/archive/codemine/codemine.apk")
+	/*
+		mobile.ParseAPKMeat("/home/christian/archive/codemine/codemine.apk")
+	*/
 }
