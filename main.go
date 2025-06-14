@@ -11,11 +11,47 @@ import (
 var width int
 
 var modules = []string{
-	"mobile attack",
-	"phishing",
-	"reconnaissance",
-	"web vulnerability",
-	"wifi attack",
+	"Mobile attack",
+	"Phishing",
+	"Reconnaissance",
+	"Web vulnerability",
+	"Wifi attack",
+}
+
+var trickMobile = []string{
+	"Injector",
+	"Recon",
+}
+
+var trickPhishTemp = []string{
+	"Facebook",
+	"Gmail",
+	"Instagram",
+	"Netflix",
+	"Outlook",
+}
+
+var trickRecon = []string{
+	"Search users",
+	"Dork searching",
+	"Whois",
+	"Dns reconnaissance",
+	"Email hunter",
+	"Port scanner",
+	"Header analyzer",
+}
+
+var trickWifi = []string{
+	"Deauth",
+	"Evil Twin",
+	"Geo-locate",
+	"HandShake",
+	"Injector",
+	"Interface",
+	"Mac Spoofer",
+	"PmKid",
+	"Sniffer",
+	"Scanner",
 }
 
 var selectedModule string
