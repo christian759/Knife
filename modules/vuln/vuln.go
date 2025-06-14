@@ -1,4 +1,3 @@
-// knife/modules/web/web_scanner.go
 package vuln
 
 import (
