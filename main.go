@@ -10,52 +10,6 @@ import (
 
 var width int
 
-var modules = []string{
-	"Mobile attack",
-	"Phishing",
-	"Reconnaissance",
-	"Web vulnerability",
-	"Wifi attack",
-}
-
-var trickMobile = []string{
-	"Injector",
-	"Recon",
-}
-
-var trickPhishTemp = []string{
-	"Facebook",
-	"Gmail",
-	"Instagram",
-	"Netflix",
-	"Outlook",
-}
-
-var trickRecon = []string{
-	"Search users",
-	"Dork searching",
-	"Whois",
-	"Dns reconnaissance",
-	"Email hunter",
-	"Port scanner",
-	"Header analyzer",
-}
-
-var trickWifi = []string{
-	"Deauth",
-	"Evil Twin",
-	"Geo-locate",
-	"HandShake",
-	"Injector",
-	"Interface",
-	"Mac Spoofer",
-	"PmKid",
-	"Sniffer",
-	"Scanner",
-}
-
-var selectedModule string
-
 // getting terminal size
 func getTerminalSize() (int, int, error) {
 	cmd := exec.Command("stty", "size")
@@ -152,115 +106,6 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 	}
 }
 
-func displayModule() string {
-	for index, module := range modules {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(modules) {
-		fmt.Println("Choice out of range")
-		return ""
-	}
-
-	// Set selected module
-	selectedModule = modules[moduleIntNo-1]
-	return selectedModule
-}
-
-func mobileModule() string {
-	for index, module := range trickMobile {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(trickMobile) {
-		fmt.Println("Choice out of range")
-		return ""
-	}
-
-	// Set selected module
-	selectedModule = modules[moduleIntNo-1]
-	return selectedModule
-}
-
-func phishModule() string {
-	for index, module := range trickPhishTemp {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(trickPhishTemp) {
-		fmt.Println("Choice out of range")
-		return ""
-	}
-
-	// Set selected module
-	selectedModule = modules[moduleIntNo-1]
-	return selectedModule
-}
-
-func reconModule() string {
-	for index, module := range trickRecon {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(trickRecon) {
-		fmt.Println("Choice out of range")
-		return ""
-	}
-
-	// Set selected module
-	selectedModule = modules[moduleIntNo-1]
-	return selectedModule
-}
-
-func vulnModule() string {
-	return ""
-}
-
-func wifiModule() string {
-	for index, module := range trickWifi {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(trickWifi) {
-		fmt.Println("Choice out of range")
-		return ""
-	}
-
-	// Set selected module
-	selectedModule = modules[moduleIntNo-1]
-	return selectedModule
-}
-
 func main() {
 	argStr := "Go-Knife"
 	sepArgs := strings.Split(argStr, "\\n")
@@ -275,25 +120,25 @@ func main() {
 	lines := strings.Split(string(file), "\n")
 	printAsciiArtAlign(sepArgs, lines, "left", width)
 
-	selectedModule = displayModule()
-	println(selectedModule)
+	SelectedModule = DisplayModules()
+	println(SelectedModule)
 
-	switch selectedModule {
+	switch SelectedModule {
 
-	case "mobile attack":
-		mobileModule()
+	case "Mobile attack":
+		MobileModule()
 
-	case "phishing":
-		phishModule()
+	case "Phishing":
+		PhishModule()
 
-	case "reconnaissance":
-		reconModule()
+	case "Reconnaissance":
+		ReconModule()
 
-	case "web vulnerability":
-		vulnModule()
+	case "Web vulnerability":
+		VulnModule()
 
-	case "wifi attack":
-		wifiModule()
+	case "Wifi attack":
+		WifiModule()
 
 	default:
 		os.Exit(0)
