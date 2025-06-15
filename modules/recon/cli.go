@@ -9,7 +9,8 @@ var userName string
 
 // dork searching
 var dorkName string
-var strict bool
+var strict string
+var engine string
 
 func Interact(selectedOption int) {
 	switch selectedOption {
@@ -21,9 +22,15 @@ func Interact(selectedOption int) {
 	case 2:
 		fmt.Println("Enter the Word or Phrase you want to search for")
 		fmt.Scan(&dorkName)
+		fmt.Println("Enter the search engine (google/duckduck):")
+		fmt.Scan(&engine)
 		fmt.Println("Strict Searching ? (Y/N):")
 		fmt.Scan(&strict)
-
+		if strict == "Y" || strict == "y" {
+			dork_searching(dorkName, true, engine)
+		} else {
+			dork_searching(dorkName, false, engine)
+		}
 	}
 
 }

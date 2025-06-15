@@ -43,16 +43,10 @@ func search_user(user string) {
 }
 
 // presently it only support google and duckduckgo
-func dork_searching(word string, websites []string, strict bool, engine string) map[string]string {
+func dork_searching(word string, strict bool, engine string) map[string]string {
 	results := make(map[string]string)
 
-	if websites == nil {
-		for name, _ := range socialsite {
-			websites = append(websites, name)
-		}
-	}
-
-	for _, site := range websites {
+	for _, site := range socialsite {
 		// Build the query
 		var query string
 		if strict {
