@@ -11,6 +11,7 @@ var userName string
 var dorkName string
 var strict string
 var engine string
+var dorkResult map[string]string
 
 func Interact(selectedOption int) {
 	switch selectedOption {
@@ -27,9 +28,15 @@ func Interact(selectedOption int) {
 		fmt.Println("Strict Searching ? (Y/N):")
 		fmt.Scan(&strict)
 		if strict == "Y" || strict == "y" {
-			dork_searching(dorkName, true, engine)
+			dorkResult = dork_searching(dorkName, true, engine)
+			for index, value := range dorkResult {
+				fmt.Println(index, value)
+			}
 		} else {
-			dork_searching(dorkName, false, engine)
+			dorkResult = dork_searching(dorkName, false, engine)
+			for index, value := range dorkResult {
+				fmt.Println(index, value)
+			}
 		}
 	}
 

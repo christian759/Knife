@@ -285,7 +285,7 @@ func main() {
 		PhishModule()
 
 	case "Reconnaissance":
-		fmt.Println(ReconModule())
+		ReconModule()
 
 	case "Web vulnerability":
 		fmt.Println(VulnModule())
