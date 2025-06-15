@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"knife/modules/phish"
+	"knife/modules/recon"
 )
 
 var width int
@@ -194,7 +195,7 @@ func PhishModule() {
 	phish.Interact(moduleIntNo)
 }
 
-func ReconModule() string {
+func ReconModule() {
 	for index, module := range TrickRecon {
 		fmt.Printf("[%d] %s\n", index+1, module)
 	}
@@ -207,12 +208,10 @@ func ReconModule() string {
 	// Validate input
 	if moduleIntNo < 1 || moduleIntNo > len(TrickRecon) {
 		fmt.Println("Choice out of range")
-		return ""
+		return
 	}
 
-	// Set selected module
-	SelectedModule = Modules[moduleIntNo-1]
-	return SelectedModule
+	recon.Interact(moduleIntNo)
 }
 
 func VulnModule() string {
