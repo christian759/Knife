@@ -2,18 +2,18 @@ package phish
 
 import "os"
 
-func Interact(selectedOption string) {
+func Interact(selectedOption int) {
 	switch selectedOption {
-	case "Facebook":
-		Launch("facebook", 8080)
-	case "Gmail":
-		Launch("gmail", 8080)
-	case "Instagram":
-		Launch("instagram", 8080)
-	case "Netflix":
-		Launch("netflix", 8080)
-	case "Outlook":
-		Launch("outlook", 8080)
+	case 1:
+		Launch("Facebook", 8080)
+	case 2:
+		Launch("Gmail", 8080)
+	case 3:
+		Launch("Instagram", 8080)
+	case 4:
+		Launch("Netflix", 8080)
+	case 5:
+		Launch("Outlook", 8080)
 	default:
 		os.Exit(1)
 	}

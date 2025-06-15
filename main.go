@@ -182,7 +182,7 @@ func PhishModule() {
 
 	// Take input
 	var moduleIntNo int
-	fmt.Print("Select a template: \n")
+	fmt.Print("Select a template: ")
 	fmt.Scan(&moduleIntNo)
 
 	// Validate input
@@ -191,9 +191,7 @@ func PhishModule() {
 		return
 	}
 
-	// Set selected module
-	SelectedModule = Modules[moduleIntNo-1]
-	phish.Interact(SelectedModule)
+	phish.Interact(moduleIntNo)
 }
 
 func ReconModule() string {
