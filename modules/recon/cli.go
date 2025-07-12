@@ -9,9 +9,20 @@ var userName string
 
 // dork searching
 var dorkName string
-var strict string
+var dorkStrict string
 var engine string
 var dorkResult map[string]string
+
+// whois
+var whoisWeb string
+
+// dns recon
+var dnsDomain string
+
+// email hunter
+var emailName string
+var emailDepth int
+var emailStrict bool
 
 func Interact(selectedOption int) {
 	switch selectedOption {
@@ -26,8 +37,8 @@ func Interact(selectedOption int) {
 		fmt.Println("Enter the search engine (google/duckduck):")
 		fmt.Scan(&engine)
 		fmt.Println("Strict Searching ? (Y/N):")
-		fmt.Scan(&strict)
-		if strict == "Y" || strict == "y" {
+		fmt.Scan(&dorkStrict)
+		if dorkStrict == "Y" || dorkStrict == "y" {
 			dorkResult = dork_searching(dorkName, true, engine)
 			for index, value := range dorkResult {
 				fmt.Println(index, value)
@@ -38,6 +49,18 @@ func Interact(selectedOption int) {
 				fmt.Println(index, value)
 			}
 		}
-	}
 
+	case 3:
+		fmt.Println("enter the website name or domain: ")
+		fmt.Scan(&whoisWeb)
+		LookupWhois(whoisWeb)
+
+	case 4:
+		fmt.Println("enter the domain name: ")
+		fmt.Scan(&dnsDomain)
+		DNSRecon(dnsDomain)
+
+	case 5:
+
+	}
 }

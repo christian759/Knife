@@ -100,7 +100,7 @@ func dork_searching(word string, strict bool, engine string) map[string]string {
 }
 
 // WHOIS RECON
-func lookupWhois(website string) {
+func LookupWhois(website string) {
 	result, _ := whois.Whois(website)
 	fmt.Println(result)
 }

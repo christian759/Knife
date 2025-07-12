@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"knife/modules/mobile"
 	"knife/modules/phish"
 	"knife/modules/recon"
 )
@@ -157,7 +158,7 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 	}
 }
 
-func MobileModule() string {
+func MobileModule() {
 	for index, module := range TrickMobile {
 		fmt.Printf("[%d] %s\n", index+1, module)
 	}
@@ -170,12 +171,15 @@ func MobileModule() string {
 	// Validate input
 	if moduleIntNo < 1 || moduleIntNo > len(TrickMobile) {
 		fmt.Println("Choice out of range")
-		return ""
 	}
 
-	// Set selected module
-	SelectedModule = Modules[moduleIntNo-1]
-	return SelectedModule
+	switch moduleIntNo {
+	case 1:
+		mobile.InteractInject()
+	case 2:
+		fmt.Println("selected number two")
+	}
+
 }
 
 func PhishModule() {
@@ -281,7 +285,7 @@ func main() {
 	switch SelectedModule {
 
 	case "Mobile attack":
-		fmt.Println(MobileModule())
+		MobileModule()
 
 	case "Phishing":
 		PhishModule()
