@@ -116,11 +116,12 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 		}
 		spaces := w/2 - wordLen/2
 		for h := 1; h < 9; h++ {
-			if position == "center" {
+			switch position {
+			case "center":
 				for i := 1; i <= spaces; i++ {
 					fmt.Print(" ")
 				}
-			} else if position == "right" {
+			case "right":
 				for i := 1; i <= spaces*2; i++ {
 					fmt.Print(" ")
 				}
@@ -140,11 +141,12 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 					}
 				}
 			}
-			if position == "center" {
+			switch position {
+			case "center":
 				for i := 1; i <= spaces; i++ {
 					fmt.Print(" ")
 				}
-			} else if position == "left" {
+			case "left":
 				for i := 1; i <= spaces*2; i++ {
 					fmt.Print(" ")
 				}
