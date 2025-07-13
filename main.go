@@ -177,7 +177,7 @@ func MobileModule() {
 	case 1:
 		mobile.InteractInject()
 	case 2:
-		fmt.Println("selected number two")
+		mobile.InteractApkMeat()
 	}
 
 }

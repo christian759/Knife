@@ -22,7 +22,10 @@ var dnsDomain string
 // email hunter
 var emailName string
 var emailDepth int
-var emailStrict bool
+var emailStrict string
+
+// web analyzer
+var webAnalyzer string
 
 func Interact(selectedOption int) {
 	switch selectedOption {
@@ -61,6 +64,22 @@ func Interact(selectedOption int) {
 		DNSRecon(dnsDomain)
 
 	case 5:
+		fmt.Println("enter email to search for: ")
+		fmt.Scan(&emailName)
+		fmt.Println("enter the search depth(number): ")
+		fmt.Scan(&emailDepth)
+		fmt.Println("deep search (Y or N): ")
 
+		if emailStrict == "Y" || emailStrict == "y" {
+			EmailHunter(emailName, emailDepth, true)
+		} else {
+			EmailHunter(emailName, emailDepth, false)
+		}
+
+	case 6:
+		fmt.Println("enter website to analyze: ")
+		fmt.Scan(&webAnalyzer)
+		HeaderAnalyzer(webAnalyzer)
 	}
+
 }

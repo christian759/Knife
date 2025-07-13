@@ -16,3 +16,9 @@ func InteractInject() {
 
 	KnifeInjectCLI(apkPath, payload, injectPath)
 }
+
+func InteractApkMeat() {
+	fmt.Println("enter apk path: ")
+	fmt.Scan(&apkPath)
+	ParseAPKMeat(apkPath)
+}
