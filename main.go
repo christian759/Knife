@@ -10,6 +10,7 @@ import (
 	"knife/modules/mobile"
 	"knife/modules/phish"
 	"knife/modules/recon"
+	"knife/modules/wifi"
 )
 
 var width int
@@ -224,7 +225,7 @@ func VulnModule() string {
 	return ""
 }
 
-func WifiModule() string {
+func WifiModule() {
 	for index, module := range TrickWifi {
 		fmt.Printf("[%d] %s\n", index+1, module)
 	}
@@ -237,12 +238,11 @@ func WifiModule() string {
 	// Validate input
 	if moduleIntNo < 1 || moduleIntNo > len(TrickWifi) {
 		fmt.Println("Choice out of range")
-		return ""
 	}
 
 	// Set selected module
-	SelectedModule = Modules[moduleIntNo-1]
-	return SelectedModule
+	SelectedModule = TrickWifi[moduleIntNo-1]
+	wifi.Interact(SelectedModule)
 }
 
 func DisplayModules() string {
@@ -297,7 +297,7 @@ func main() {
 		fmt.Println(VulnModule())
 
 	case "Wifi attack":
-		fmt.Println(WifiModule())
+		WifiModule()
 
 	default:
 		os.Exit(1)

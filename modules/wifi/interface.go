@@ -11,6 +11,13 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+var interfaceWifi []string = []string{
+	"List Interface",
+	"Enable Monitor Mode",
+	"Restore Managed Mode",
+	"Start Packet Sniffer",
+}
+
 // ListInterfaces returns all wireless interfaces available
 func ListInterfaces() ([]string, error) {
 	out, err := exec.Command("bash", "-c", "iw dev | grep Interface | awk '{print $2}'").Output()
