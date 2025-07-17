@@ -1,19 +1,15 @@
 package wifi
 
-import "fmt"
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
 
-var wifiFunc = []string{
-	"Deauth",
-	"Evil Twin",
-	"Geo-locate",
-	"HandShake",
-	"Injector",
-	"Interface",
-	"Mac Spoofer",
-	"PmKid",
-	"Sniffer",
-	"Scanner",
-}
+var reader = bufio.NewReader(os.Stdin)
 
 func Interact(choice string) {
 	switch choice {
@@ -27,6 +23,8 @@ func Interact(choice string) {
 		HandShakeHandle()
 	case "Injector":
 		InjectorHandle()
+	case "Interface":
+		InterfaceHandle()
 	case "Mac Spoofer":
 		MacSpooferHandle()
 	case "Pmkid":
@@ -35,42 +33,230 @@ func Interact(choice string) {
 		SnifferHandle()
 	case "Scanner":
 		ScannerHandle()
+	default:
+		fmt.Println("Unknown option:", choice)
 	}
 }
 
-// TODO: ADD MAIN FUNCTIONALITY
+// Deauth attack handler
 func DeauthHandle() {
-	fmt.Println("i am deauth")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("BSSID (AP MAC): ")
+	bssid, _ := reader.ReadString('\n')
+	bssid = strings.TrimSpace(bssid)
+	fmt.Print("Target MAC (or ff:ff:ff:ff:ff:ff for broadcast): ")
+	target, _ := reader.ReadString('\n')
+	target = strings.TrimSpace(target)
+	fmt.Print("Count: ")
+	countStr, _ := reader.ReadString('\n')
+	countStr = strings.TrimSpace(countStr)
+	count, _ := strconv.Atoi(countStr)
+	err := DeauthAttack(iface, bssid, target, count)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Deauth sent.")
+	}
 }
 
 func EvilTwinHandle() {
-	fmt.Println("i am evil handle")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("SSID to fake: ")
+	ssid, _ := reader.ReadString('\n')
+	ssid = strings.TrimSpace(ssid)
+	StartEvilTwin(iface, ssid)
+	fmt.Println("Press Enter to stop Evil Twin...")
+	reader.ReadString('\n')
+	StopEvilTwin()
 }
 
 func GeoloacateHandle() {
-	fmt.Println("i am geoloacte")
+	fmt.Print("MAC address (BSSID): ")
+	mac, _ := reader.ReadString('\n')
+	mac = strings.TrimSpace(mac)
+	fmt.Print("Signal strength (dBm): ")
+	signalStr, _ := reader.ReadString('\n')
+	signalStr = strings.TrimSpace(signalStr)
+	signal, _ := strconv.Atoi(signalStr)
+	fmt.Print("Google API Key: ")
+	apiKey, _ := reader.ReadString('\n')
+	apiKey = strings.TrimSpace(apiKey)
+	resp, err := Geolocate([]WiFiAccessPoint{{MacAddress: mac, SignalStrength: signal}}, apiKey)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Printf("Lat: %.6f, Lng: %.6f (Accuracy: %.2fm)\n", resp.Location.Lat, resp.Location.Lng, resp.Accuracy)
+	}
 }
 
 func HandShakeHandle() {
-	fmt.Println("i am handshake")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("Output file: ")
+	file, _ := reader.ReadString('\n')
+	file = strings.TrimSpace(file)
+	fmt.Print("Timeout (seconds): ")
+	timeoutStr, _ := reader.ReadString('\n')
+	timeoutStr = strings.TrimSpace(timeoutStr)
+	timeout, _ := strconv.Atoi(timeoutStr)
+	err := CaptureHandshake(iface, file, time.Duration(timeout)*time.Second)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Handshake capture complete.")
+	}
 }
 
 func InjectorHandle() {
-	fmt.Println("i am injector")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("SSID to flood: ")
+	ssid, _ := reader.ReadString('\n')
+	ssid = strings.TrimSpace(ssid)
+	fmt.Print("Count: ")
+	countStr, _ := reader.ReadString('\n')
+	countStr = strings.TrimSpace(countStr)
+	count, _ := strconv.Atoi(countStr)
+	InjectBeaconFlood(iface, ssid, count)
+	fmt.Println("Beacon flood sent.")
+}
+
+func InterfaceHandle() {
+	fmt.Println("Available actions:")
+	for i, v := range interfaceWifi {
+		fmt.Printf("%d. %s\n", i+1, v)
+	}
+	fmt.Print("Select action: ")
+	actionIdxStr, _ := reader.ReadString('\n')
+	actionIdxStr = strings.TrimSpace(actionIdxStr)
+	actionIdx, _ := strconv.Atoi(actionIdxStr)
+	if actionIdx < 1 || actionIdx > len(interfaceWifi) {
+		fmt.Println("Invalid selection.")
+		return
+	}
+	action := interfaceWifi[actionIdx-1]
+	var iface string
+	if action != "List Interface" {
+		fmt.Print("Interface: ")
+		iface, _ = reader.ReadString('\n')
+		iface = strings.TrimSpace(iface)
+	}
+	err := HandleWifiAction(action, iface)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
 }
 
 func MacSpooferHandle() {
-	fmt.Println("i am mac spoofer")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("Randomize MAC? (Y/N): ")
+	ans, _ := reader.ReadString('\n')
+	ans = strings.TrimSpace(ans)
+	if ans == "Y" || ans == "y" {
+		mac, err := RandomMAC(iface)
+		if err != nil {
+			fmt.Println("Error:", err)
+		} else {
+			fmt.Println("New MAC:", mac)
+		}
+	} else {
+		mac, err := GetCurrentMAC(iface)
+		if err != nil {
+			fmt.Println("Error:", err)
+		} else {
+			fmt.Println("Current MAC:", mac)
+		}
+	}
 }
 
 func PmkidHandle() {
-	fmt.Println("i am pmkid")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("Output file: ")
+	file, _ := reader.ReadString('\n')
+	file = strings.TrimSpace(file)
+	fmt.Print("Timeout (seconds): ")
+	timeoutStr, _ := reader.ReadString('\n')
+	timeoutStr = strings.TrimSpace(timeoutStr)
+	timeout, _ := strconv.Atoi(timeoutStr)
+	err := CapturePMKID(iface, file, time.Duration(timeout)*time.Second)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("PMKID capture complete.")
+	}
 }
 
 func SnifferHandle() {
-	fmt.Println("i am sniffer")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	fmt.Print("Sniff probe requests only? (Y/N): ")
+	ans, _ := reader.ReadString('\n')
+	ans = strings.TrimSpace(ans)
+	if ans == "Y" || ans == "y" {
+		fmt.Print("Timeout (seconds): ")
+		timeoutStr, _ := reader.ReadString('\n')
+		timeoutStr = strings.TrimSpace(timeoutStr)
+		timeout, _ := strconv.Atoi(timeoutStr)
+		SniffProbes(iface, time.Duration(timeout)*time.Second)
+	} else {
+		StartPacketSniffer(iface)
+	}
 }
 
 func ScannerHandle() {
-	fmt.Println("i am scanner")
+	fmt.Print("Interface: ")
+	iface, _ := reader.ReadString('\n')
+	iface = strings.TrimSpace(iface)
+	ssids, err := ScanNetworks(iface)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Found SSIDs:")
+	for _, ssid := range ssids {
+		fmt.Println("-", ssid)
+	}
+	fmt.Print("Channel hop? (Y/N): ")
+	ans, _ := reader.ReadString('\n')
+	ans = strings.TrimSpace(ans)
+	if ans == "Y" || ans == "y" {
+		fmt.Print("Hop delay (ms): ")
+		delayStr, _ := reader.ReadString('\n')
+		delayStr = strings.TrimSpace(delayStr)
+		delay, _ := strconv.Atoi(delayStr)
+		fmt.Println("Channel hopping. Press Ctrl+C to stop.")
+		for {
+			ssids, err := ScanNetworks(iface)
+			if err != nil {
+				fmt.Println("Error:", err)
+			} else {
+				fmt.Println("Found SSIDs:")
+				for _, ssid := range ssids {
+					fmt.Println("-", ssid)
+				}
+			}
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+		}
+	} else {
+		ssids, err := ScanNetworks(iface)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println("Found SSIDs:")
+		for _, ssid := range ssids {
+			fmt.Println("-", ssid)
+		}
+	}
 }
