@@ -2,6 +2,7 @@ package recon
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,43 +17,95 @@ func Interact(selectedOption int) {
 	switch selectedOption {
 	case 1:
 		userName := readInput("Enter the username to search for:")
-		
 		sitesInput := readInput("Enter sites to search (comma separated, e.g. https://github.com,https://twitter.com):")
 		sites := parseCSVInput(sitesInput)
 		if len(sites) == 0 {
 			fmt.Println("No sites provided.")
 			return
 		}
-		SearchUser(userName, sites)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		results, err := SearchUser(ctx, userName, sites)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if len(results) == 0 {
+			fmt.Println("No profiles found.")
+		} else {
+			fmt.Println("Found profiles:")
+			for _, url := range results {
+				fmt.Println(" -", url)
+			}
+		}
 
 	case 2:
 		dorkName := readInput("Enter the dork or search phrase:")
 		dorkEngine := readInput("Enter the search engine (google/duckduck):")
 		maxResults := readIntInput("Max results (number):", 10)
-
-		results := DorkSearching(dorkName, dorkEngine, maxResults)
-		fmt.Println("Results:")
-		for i, value := range results {
-			fmt.Printf("%d. %s\n", i+1, value)
+		results, err := DorkSearch(dorkName, dorkEngine, maxResults)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if len(results) == 0 {
+			fmt.Println("No results found.")
+		} else {
+			fmt.Println("Results:")
+			for i, value := range results {
+				fmt.Printf("%d. %s\n", i+1, value)
+			}
 		}
 
 	case 3:
 		whoisWeb := readInput("Enter the website or domain for WHOIS lookup:")
-		LookupWhois(whoisWeb)
+		result, err := WhoisLookup(whoisWeb)
+		if err != nil {
+			fmt.Println("Error:", err)
+		} else {
+			fmt.Println(result)
+		}
 
 	case 4:
 		dnsDomain := readInput("Enter the domain name for DNS recon:")
-		DNSRecon(dnsDomain)
+		res := DNSRecon(dnsDomain)
+		fmt.Println("A records:", res.A)
+		fmt.Println("AAAA records:", res.AAAA)
+		fmt.Println("MX records:", res.MX)
+		fmt.Println("NS records:", res.NS)
+		fmt.Println("TXT records:", res.TXT)
+		fmt.Println("CNAME:", res.CNAME)
+		fmt.Println("Wildcard DNS detected:", res.HasWildcard)
 
 	case 5:
 		emailName := readInput("Enter the domain to hunt for emails (e.g. example.com):")
 		emailDepth := readIntInput("Enter the search depth (number):", 2)
 		emailStrict := readBoolInput("Strict search (only emails ending with @domain)? (Y/N):")
-		EmailHunter(emailName, emailDepth, emailStrict)
+		emails, err := EmailHunter(emailName, emailDepth, emailStrict)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if len(emails) == 0 {
+			fmt.Println("No emails found.")
+		} else {
+			fmt.Println("Emails found:")
+			for _, email := range emails {
+				fmt.Println(" -", email)
+			}
+		}
 
 	case 6:
 		webAnalyzer := readInput("Enter website to analyze headers (e.g. https://example.com):")
-		HeaderAnalyzer(webAnalyzer)
+		headers, err := HeaderAnalyze(webAnalyzer)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println("Interesting headers:")
+		for k, v := range headers {
+			fmt.Printf("%s: %s\n", k, v)
+		}
 
 	case 7:
 		target := readInput("Enter target for port scan (IP or domain):")
@@ -62,10 +115,17 @@ func Interact(selectedOption int) {
 			fmt.Println("No valid ports provided.")
 			return
 		}
-
 		udp := readBoolInput("Scan UDP? (Y/N):")
 		timeout := readIntInput("Timeout per port (seconds):", 2)
-		PortScanner(target, ports, time.Duration(timeout)*time.Second, udp)
+		results := PortScan(target, ports, time.Duration(timeout)*time.Second, udp)
+		if len(results) == 0 {
+			fmt.Println("No open ports found.")
+		} else {
+			fmt.Println("Open ports:")
+			for _, r := range results {
+				fmt.Printf("%s/%d: %s\n", r.Proto, r.Port, r.Banner)
+			}
+		}
 	default:
 		fmt.Println("Unknown option.")
 	}

@@ -1,12 +1,13 @@
 package recon
 
 import (
+	"context"
 	"fmt"
-	"knife/util"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,26 +16,32 @@ import (
 	"github.com/likexian/whois"
 )
 
-// Search for a username across a list of sites provided by the user
-func SearchUser(username string, sites []string) {
-	fmt.Println("Searching for user:", username)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+// 1. Username Enumeration: Returns all URLs where the username exists.
+func SearchUser(ctx context.Context, username string, sites []string) ([]string, error) {
 	var wg sync.WaitGroup
 	found := make(chan string, len(sites))
+	client := &http.Client{Timeout: 8 * time.Second}
 
 	for _, site := range sites {
 		wg.Add(1)
 		go func(site string) {
 			defer wg.Done()
-			url := strings.TrimRight(site, "/") + "/" + username
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-			resp, err := http.DefaultClient.Do(req)
-			if err == nil && resp.StatusCode == 200 {
-				found <- url
-			}
-			if resp != nil {
-				resp.Body.Close()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				profileURL := strings.TrimRight(site, "/") + "/" + username
+				req, err := http.NewRequestWithContext(ctx, "GET", profileURL, nil)
+				if err != nil {
+					return
+				}
+				resp, err := client.Do(req)
+				if err == nil && resp.StatusCode == 200 {
+					found <- profileURL
+				}
+				if resp != nil {
+					resp.Body.Close()
+				}
 			}
 		}(site)
 	}
@@ -44,14 +51,16 @@ func SearchUser(username string, sites []string) {
 		close(found)
 	}()
 
+	var results []string
 	for url := range found {
-		fmt.Println("Found:", url)
+		results = append(results, url)
 	}
+	sort.Strings(results)
+	return results, nil
 }
 
-// Dork searching with concurrency and more flexible dork input
-func DorkSearching(dork string, engine string, maxResults int) []string {
-	results := []string{}
+// 2. Dork Search: Returns a list of found URLs from Google or DuckDuckGo.
+func DorkSearch(query, engine string, maxResults int) ([]string, error) {
 	c := colly.NewCollector(
 		colly.UserAgent("Mozilla/5.0"),
 		colly.Async(true),
@@ -73,39 +82,34 @@ func DorkSearching(dork string, engine string, maxResults int) []string {
 	})
 
 	var searchURL string
-	escapedQuery := url.QueryEscape(dork)
-	switch engine {
+	escaped := url.QueryEscape(query)
+	switch strings.ToLower(engine) {
 	case "google":
-		searchURL = fmt.Sprintf("https://www.google.com/search?q=%s", escapedQuery)
-	case "duckduck":
-		searchURL = fmt.Sprintf("https://html.duckduckgo.com/html/?q=%s", escapedQuery)
+		searchURL = "https://www.google.com/search?q=" + escaped
+	case "duckduckgo", "duckduck":
+		searchURL = "https://html.duckduckgo.com/html/?q=" + escaped
 	default:
-		fmt.Println("Unsupported search engine.")
-		return results
+		return nil, fmt.Errorf("unsupported search engine")
 	}
 
-	c.Visit(searchURL)
+	_ = c.Visit(searchURL)
 	c.Wait()
 
+	var results []string
 	for link := range resultSet {
 		results = append(results, link)
 	}
-	return results
+	sort.Strings(results)
+	return results, nil
 }
 
-// WHOIS RECON
-func LookupWhois(website string) {
-	result, err := whois.Whois(website)
-	if err != nil {
-		fmt.Println("WHOIS lookup failed:", err)
-		return
-	}
-	fmt.Println("WHOIS Lookup result:")
-	fmt.Println(result)
+// 3. WHOIS Lookup: Returns the raw WHOIS string.
+func WhoisLookup(domain string) (string, error) {
+	return whois.Whois(domain)
 }
 
-// DNS RECON
-type DNSRecord struct {
+// 4. DNS Recon: Returns all major DNS records and wildcard detection.
+type DNSReconResult struct {
 	A           []string
 	AAAA        []string
 	MX          []string
@@ -115,67 +119,46 @@ type DNSRecord struct {
 	HasWildcard bool
 }
 
-func DNSRecon(domain string) {
-	var result DNSRecord
+func DNSRecon(domain string) DNSReconResult {
+	var res DNSReconResult
 
-	// A
-	if ips, err := net.LookupHost(domain); err == nil {
-		result.A = ips
+	if ips, _ := net.LookupHost(domain); len(ips) > 0 {
+		res.A = ips
 	}
-
-	// AAAA
-	if ips, err := net.LookupIP(domain); err == nil {
+	if ips, _ := net.LookupIP(domain); len(ips) > 0 {
 		for _, ip := range ips {
 			if ip.To4() == nil {
-				result.AAAA = append(result.AAAA, ip.String())
+				res.AAAA = append(res.AAAA, ip.String())
 			}
 		}
 	}
-
-	// MX
-	if mxRecords, err := net.LookupMX(domain); err == nil {
-		for _, mx := range mxRecords {
-			result.MX = append(result.MX, fmt.Sprintf("%s (%d)", mx.Host, mx.Pref))
+	if mxs, _ := net.LookupMX(domain); len(mxs) > 0 {
+		for _, mx := range mxs {
+			res.MX = append(res.MX, fmt.Sprintf("%s (%d)", mx.Host, mx.Pref))
 		}
 	}
-
-	// NS
-	if ns, err := net.LookupNS(domain); err == nil {
-		for _, n := range ns {
-			result.NS = append(result.NS, n.Host)
+	if nss, _ := net.LookupNS(domain); len(nss) > 0 {
+		for _, ns := range nss {
+			res.NS = append(res.NS, ns.Host)
 		}
 	}
-
-	// TXT
-	if txts, err := net.LookupTXT(domain); err == nil {
-		result.TXT = txts
+	if txts, _ := net.LookupTXT(domain); len(txts) > 0 {
+		res.TXT = txts
 	}
-
-	// CNAME
 	if cname, err := net.LookupCNAME(domain); err == nil && !strings.EqualFold(cname, domain+".") {
-		result.CNAME = cname
+		res.CNAME = cname
 	}
-
-	// Wildcard test (resolve a likely non-existent subdomain)
-	wildTest := "unlikely-" + util.RandString(10) + "." + domain
-	if wildcardIPs, err := net.LookupHost(wildTest); err == nil && len(wildcardIPs) > 0 {
-		result.HasWildcard = true
+	// Wildcard detection
+	wild := "wildcard-" + randomString(10) + "." + domain
+	if ips, _ := net.LookupHost(wild); len(ips) > 0 {
+		res.HasWildcard = true
 	}
-
-	fmt.Println("== DNS Records ==")
-	fmt.Println("A:", result.A)
-	fmt.Println("AAAA:", result.AAAA)
-	fmt.Println("MX:", result.MX)
-	fmt.Println("NS:", result.NS)
-	fmt.Println("TXT:", result.TXT)
-	fmt.Println("CNAME:", result.CNAME)
-	fmt.Println("Wildcard DNS Detected:", result.HasWildcard)
+	return res
 }
 
-// EMAIL HUNTER
-func EmailHunter(domain string, maxDepth int, strict bool) {
+// 5. Email Hunter: Returns all emails found on the domain (optionally strict).
+func EmailHunter(domain string, maxDepth int, strict bool) ([]string, error) {
 	emailSet := make(map[string]struct{})
-
 	c := colly.NewCollector(
 		colly.MaxDepth(maxDepth),
 		colly.AllowedDomains(domain, "www."+domain),
@@ -183,19 +166,14 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 	)
 	c.Limit(&colly.LimitRule{Parallelism: 10})
 
-	// Regex for emails
 	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@` + regexp.QuoteMeta(domain))
 
-	// On every HTML page
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		matches := emailRegex.FindAllString(e.Text, -1)
 		for _, email := range matches {
-			email = strings.ToLower(email)
-			emailSet[email] = struct{}{}
+			emailSet[strings.ToLower(email)] = struct{}{}
 		}
 	})
-
-	// On links (to follow internal pages)
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Request.AbsoluteURL(e.Attr("href"))
 		if strings.Contains(link, domain) {
@@ -203,56 +181,42 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 		}
 	})
 
-	c.OnError(func(r *colly.Response, err error) {
-		fmt.Printf("Error: %s (%d)\n", r.Request.URL, r.StatusCode)
-	})
-
 	startURL := "https://" + domain
-	err := c.Visit(startURL)
-	if err != nil {
-		fmt.Println("Crawl error:", err)
-	}
+	_ = c.Visit(startURL)
 	c.Wait()
 
-	// Convert map to slice
 	var emails []string
 	for email := range emailSet {
 		if !strict || strings.HasSuffix(email, "@"+domain) {
 			emails = append(emails, email)
 		}
 	}
-
-	fmt.Println("📬 Emails found:")
-	for _, email := range emails {
-		fmt.Println(" -", email)
-	}
+	sort.Strings(emails)
+	return emails, nil
 }
 
-// PORT SCANNER (TCP/UDP, concurrent)
-func PortScanner(target string, ports []int, timeout time.Duration, udp bool) {
-	results := make(map[string]string)
-	portsChan := make(chan int, 100)
-	resultsChan := make(chan struct {
-		Port   int
-		Banner string
-	}, 100)
+// 6. Port Scanner: Returns open ports and banners (TCP or UDP).
+type PortResult struct {
+	Port   int
+	Proto  string
+	Banner string
+}
 
-	worker := func() {
-		for port := range portsChan {
-			var address string
-			if strings.Contains(target, ":") && !strings.HasPrefix(target, "[") {
-				address = fmt.Sprintf("[%s]:%d", target, port)
-			} else {
-				address = fmt.Sprintf("%s:%d", target, port)
-			}
+func PortScan(target string, ports []int, timeout time.Duration, udp bool) []PortResult {
+	var wg sync.WaitGroup
+	results := make(chan PortResult, len(ports))
+
+	for _, port := range ports {
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+			// Use net.JoinHostPort for proper IPv4/IPv6 formatting
+			address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
 			if udp {
 				conn, err := net.DialTimeout("udp", address, timeout)
 				if err == nil {
 					_ = conn.Close()
-					resultsChan <- struct {
-						Port   int
-						Banner string
-					}{port, "open (UDP)"}
+					results <- PortResult{Port: port, Proto: "udp", Banner: "open"}
 				}
 			} else {
 				conn, err := net.DialTimeout("tcp", address, timeout)
@@ -265,92 +229,61 @@ func PortScanner(target string, ports []int, timeout time.Duration, udp bool) {
 						banner = "open"
 					}
 					_ = conn.Close()
-					resultsChan <- struct {
-						Port   int
-						Banner string
-					}{port, banner}
+					results <- PortResult{Port: port, Proto: "tcp", Banner: banner}
 				}
 			}
-		}
+		}(port)
 	}
 
-	// Start workers
-	for i := 0; i < 100; i++ {
-		go worker()
-	}
-
-	// Feed ports
 	go func() {
-		for _, port := range ports {
-			portsChan <- port
-		}
-		close(portsChan)
+		wg.Wait()
+		close(results)
 	}()
 
-	// Collect results
-	for range ports {
-		select {
-		case r := <-resultsChan:
-			proto := "tcp"
-			if udp {
-				proto = "udp"
-			}
-			results[fmt.Sprintf("%s/%d", proto, r.Port)] = r.Banner
-		case <-time.After(timeout + 1*time.Second):
-			// Skip timeout ports
-		}
+	var out []PortResult
+	for r := range results {
+		out = append(out, r)
 	}
-
-	fmt.Println("✅ Results:")
-	for port, banner := range results {
-		fmt.Printf(" - %s: %s\n", port, banner)
-	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Port < out[j].Port })
+	return out
 }
 
-// HEADER ANALYZER
-func HeaderAnalyzer(target string) {
-	results := make(map[string]string)
-
-	// Ensure scheme is there
+// 7. Header Analyzer: Returns a map of interesting headers.
+func HeaderAnalyze(target string) (map[string]string, error) {
 	if !strings.HasPrefix(target, "http") {
 		target = "http://" + target
 	}
-
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
+	client := &http.Client{Timeout: 6 * time.Second}
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		results["error"] = "invalid request"
-		print(results)
-		return
+		return nil, err
 	}
-
 	resp, err := client.Do(req)
 	if err != nil {
-		results["error"] = "connection failed"
-		print(results)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 
+	headers := map[string]string{"Status": resp.Status}
 	for k, v := range resp.Header {
 		key := strings.ToLower(k)
-		// Only extract juicy headers
 		switch key {
 		case "server", "x-powered-by", "set-cookie", "content-type",
 			"strict-transport-security", "content-security-policy",
 			"x-frame-options", "x-xss-protection", "x-content-type-options":
-			results[k] = strings.Join(v, "; ")
+			headers[k] = strings.Join(v, "; ")
 		}
 	}
+	return headers, nil
+}
 
-	results["Status"] = resp.Status
-
-	fmt.Println("📡 Header Scan Results:")
-	for k, v := range results {
-		fmt.Printf(" - %s: %s\n", k, v)
+// --- Utility ---
+func randomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
+		time.Sleep(time.Nanosecond) // ensure different seed
 	}
-
+	return string(b)
 }
