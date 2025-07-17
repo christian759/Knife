@@ -172,6 +172,7 @@ func MobileModule() {
 	// Validate input
 	if moduleIntNo < 1 || moduleIntNo > len(TrickMobile) {
 		fmt.Println("Choice out of range")
+		return
 	}
 
 	switch moduleIntNo {
@@ -238,6 +239,7 @@ func WifiModule() {
 	// Validate input
 	if moduleIntNo < 1 || moduleIntNo > len(TrickWifi) {
 		fmt.Println("Choice out of range")
+		return
 	}
 
 	// Set selected module
@@ -280,7 +282,7 @@ func main() {
 	printAsciiArtAlign(sepArgs, lines, "left", width)
 
 	SelectedModule = DisplayModules()
-	println(SelectedModule)
+	fmt.Println(SelectedModule)
 
 	switch SelectedModule {
 

@@ -69,3 +69,23 @@ func StartPacketSniffer(iface string) {
 		fmt.Println(packet)
 	}
 }
+
+func HandleWifiAction(action, iface string) error {
+	switch action {
+	case "List Interface":
+		interfaces, err := ListInterfaces()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Available interfaces:", interfaces)
+	case "Enable Monitor Mode":
+		return EnableMonitorMode(iface)
+	case "Restore Managed Mode":
+		return RestoreManagedMode(iface)
+	case "Start Packet Sniffer":
+		StartPacketSniffer(iface)
+	default:
+		return fmt.Errorf("unknown action: %s", action)
+	}
+	return nil
+}
