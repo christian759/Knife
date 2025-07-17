@@ -6,99 +6,114 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // global input reader
 var reader = bufio.NewReader(os.Stdin)
 
-// user search
-var userName string
-
-// dork searching
-var dorkName string
-var dorkStrict string
-var dorkEngine string
-var dorkResult map[string]string
-
-// whois
-var whoisWeb string
-
-// dns recon
-var dnsDomain string
-
-// email hunter
-var emailName string
-var emailDepth int
-var emailStrict string
-
-// web analyzer
-var webAnalyzer string
-
 func Interact(selectedOption int) {
 	switch selectedOption {
 	case 1:
-		fmt.Println("Enter the name of the Person:")
-		input, _ := reader.ReadString('\n')
-		userName = strings.TrimSpace(input)
-		search_user(userName)
+		userName := readInput("Enter the username to search for:")
+		
+		sitesInput := readInput("Enter sites to search (comma separated, e.g. https://github.com,https://twitter.com):")
+		sites := parseCSVInput(sitesInput)
+		if len(sites) == 0 {
+			fmt.Println("No sites provided.")
+			return
+		}
+		SearchUser(userName, sites)
 
 	case 2:
-		fmt.Println("Enter the Word or Phrase you want to search for:")
-		input, _ := reader.ReadString('\n')
-		dorkName = strings.TrimSpace(input)
+		dorkName := readInput("Enter the dork or search phrase:")
+		dorkEngine := readInput("Enter the search engine (google/duckduck):")
+		maxResults := readIntInput("Max results (number):", 10)
 
-		fmt.Println("Enter the search engine (google/duckduck):")
-		input, _ = reader.ReadString('\n')
-		dorkEngine = strings.TrimSpace(input)
-
-		fmt.Println("Strict Searching? (Y/N):")
-		input, _ = reader.ReadString('\n')
-		dorkStrict = strings.TrimSpace(input)
-
-		if dorkStrict == "Y" || dorkStrict == "y" {
-			dorkResult = dork_searching(dorkName, true, dorkEngine)
-		} else {
-			dorkResult = dork_searching(dorkName, false, dorkEngine)
-		}
-		for index, value := range dorkResult {
-			fmt.Println(index, value)
+		results := DorkSearching(dorkName, dorkEngine, maxResults)
+		fmt.Println("Results:")
+		for i, value := range results {
+			fmt.Printf("%d. %s\n", i+1, value)
 		}
 
 	case 3:
-		fmt.Println("Enter the website name or domain:")
-		input, _ := reader.ReadString('\n')
-		whoisWeb = strings.TrimSpace(input)
+		whoisWeb := readInput("Enter the website or domain for WHOIS lookup:")
 		LookupWhois(whoisWeb)
 
 	case 4:
-		fmt.Println("Enter the domain name:")
-		input, _ := reader.ReadString('\n')
-		dnsDomain = strings.TrimSpace(input)
+		dnsDomain := readInput("Enter the domain name for DNS recon:")
 		DNSRecon(dnsDomain)
 
 	case 5:
-		fmt.Println("Enter email to search for: ")
-		input, _ := reader.ReadString('\n')
-		emailName = strings.TrimSpace(input)
-
-		fmt.Println("Enter the search depth (number): ")
-		input, _ = reader.ReadString('\n')
-		emailDepth, _ = strconv.Atoi(strings.TrimSpace(input))
-
-		fmt.Println("Deep search? (Y/N): ")
-		input, _ = reader.ReadString('\n')
-		emailStrict = strings.TrimSpace(input)
-
-		if emailStrict == "Y" || emailStrict == "y" {
-			EmailHunter(emailName, emailDepth, true)
-		} else {
-			EmailHunter(emailName, emailDepth, false)
-		}
+		emailName := readInput("Enter the domain to hunt for emails (e.g. example.com):")
+		emailDepth := readIntInput("Enter the search depth (number):", 2)
+		emailStrict := readBoolInput("Strict search (only emails ending with @domain)? (Y/N):")
+		EmailHunter(emailName, emailDepth, emailStrict)
 
 	case 6:
-		fmt.Println("Enter website to analyze:")
-		input, _ := reader.ReadString('\n')
-		webAnalyzer = strings.TrimSpace(input)
+		webAnalyzer := readInput("Enter website to analyze headers (e.g. https://example.com):")
 		HeaderAnalyzer(webAnalyzer)
+
+	case 7:
+		target := readInput("Enter target for port scan (IP or domain):")
+		portsInput := readInput("Enter ports to scan (comma separated, e.g. 80,443,8080):")
+		ports := parsePortsInput(portsInput)
+		if len(ports) == 0 {
+			fmt.Println("No valid ports provided.")
+			return
+		}
+
+		udp := readBoolInput("Scan UDP? (Y/N):")
+		timeout := readIntInput("Timeout per port (seconds):", 2)
+		PortScanner(target, ports, time.Duration(timeout)*time.Second, udp)
+	default:
+		fmt.Println("Unknown option.")
 	}
+}
+
+// Helper function to read and trim input
+func readInput(prompt string) string {
+	fmt.Println(prompt)
+	input, _ := reader.ReadString('\n')
+	return strings.TrimSpace(input)
+}
+
+// Helper function to read integer input with a default value
+func readIntInput(prompt string, defaultValue int) int {
+	input := readInput(prompt)
+	value, err := strconv.Atoi(input)
+	if err != nil || value < 1 {
+		return defaultValue
+	}
+	return value
+}
+
+// Helper function to read boolean (Y/N) input
+func readBoolInput(prompt string) bool {
+	input := readInput(prompt)
+	return input == "Y" || input == "y"
+}
+
+// Helper function to parse CSV input
+func parseCSVInput(input string) []string {
+	var result []string
+	for _, s := range strings.Split(input, ",") {
+		site := strings.TrimSpace(s)
+		if site != "" {
+			result = append(result, site)
+		}
+	}
+	return result
+}
+
+// Helper function to parse ports input
+func parsePortsInput(input string) []int {
+	var ports []int
+	for _, p := range strings.Split(input, ",") {
+		port, err := strconv.Atoi(strings.TrimSpace(p))
+		if err == nil && port > 0 && port < 65536 {
+			ports = append(ports, port)
+		}
+	}
+	return ports
 }

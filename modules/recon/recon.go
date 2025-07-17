@@ -3,105 +3,104 @@ package recon
 import (
 	"fmt"
 	"knife/util"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/likexian/whois"
 )
 
-var socialsite = map[string]string{
-	"facebook":  "https://web.facebook.com/",
-	"twitter":   "https://x.com/",
-	"github":    "https://github.com/",
-	"tiktok":    "https://www.tiktok.com/@",
-	"youtube":   "https://www.youtube/@",
-	"instagram": "https://www.instagram/",
-	"twitch":    "https://www.twitch.tv/",
-	"medium":    "https://medium.com/@",
-	"linkedin":  "https://www.linkedin.com/in/",
-	"threads":   "https://www.threads.com/",
-}
+// Search for a username across a list of sites provided by the user
+func SearchUser(username string, sites []string) {
+	fmt.Println("Searching for user:", username)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var wg sync.WaitGroup
+	found := make(chan string, len(sites))
 
-// searching for users in various web
-func search_user(user string) {
-	fmt.Println("Found: ")
-	for name, site := range socialsite {
-		trialsite := site + user
-		_, err := http.Get(trialsite)
-		if err != nil {
-			panic(err)
-		} else {
-			fmt.Printf("%s: %s \n", name, trialsite)
-		}
+	for _, site := range sites {
+		wg.Add(1)
+		go func(site string) {
+			defer wg.Done()
+			url := strings.TrimRight(site, "/") + "/" + username
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err := http.DefaultClient.Do(req)
+			if err == nil && resp.StatusCode == 200 {
+				found <- url
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+		}(site)
+	}
+
+	go func() {
+		wg.Wait()
+		close(found)
+	}()
+
+	for url := range found {
+		fmt.Println("Found:", url)
 	}
 }
 
-// presently it only support google and duckduckgo
-func dork_searching(word string, strict bool, engine string) map[string]string {
-	results := make(map[string]string)
+// Dork searching with concurrency and more flexible dork input
+func DorkSearching(dork string, engine string, maxResults int) []string {
+	results := []string{}
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0"),
+		colly.Async(true),
+	)
+	c.Limit(&colly.LimitRule{Parallelism: 5})
 
-	for _, site := range socialsite {
-		// Build the query
-		var query string
-		if strict {
-			query = fmt.Sprintf("site:%s \"%s\"", site, word)
-		} else {
-			query = fmt.Sprintf("site:%s %s", site, word)
-		}
-		escapedQuery := url.QueryEscape(query)
+	resultSet := make(map[string]struct{})
+	mu := sync.Mutex{}
 
-		// Choose search engine
-		var searchURL string
-		if engine == "google" {
-			searchURL = fmt.Sprintf("https://www.google.com/search?q=%s", escapedQuery)
-		} else {
-			searchURL = fmt.Sprintf("https://html.duckduckgo.com/html/?q=%s", escapedQuery)
-		}
-
-		// Create collector
-		c := colly.NewCollector(
-			colly.UserAgent("Mozilla/5.0"),
-		)
-
-		// Extract result links
-		c.OnHTML("a", func(e *colly.HTMLElement) {
-			href := e.Attr("href")
-
-			if engine == "google" && strings.HasPrefix(href, "/url?q=") {
-				cleaned := strings.Split(strings.TrimPrefix(href, "/url?q="), "&")[0]
-				if strings.HasPrefix(cleaned, "http") {
-					results[query] = cleaned
-				}
+	c.OnHTML("a", func(e *colly.HTMLElement) {
+		href := e.Attr("href")
+		if strings.HasPrefix(href, "http") {
+			mu.Lock()
+			if len(resultSet) < maxResults {
+				resultSet[href] = struct{}{}
 			}
-
-			if engine == "duck" && strings.Contains(e.Attr("class"), "result__a") {
-				href := e.Attr("href")
-				if strings.HasPrefix(href, "http") {
-					results[query] = href
-				}
-			}
-		})
-
-		// Visit search URL
-		err := c.Visit(searchURL)
-		if err != nil {
-			log.Println("Failed to fetch:", err)
-			continue
+			mu.Unlock()
 		}
+	})
+
+	var searchURL string
+	escapedQuery := url.QueryEscape(dork)
+	switch engine {
+	case "google":
+		searchURL = fmt.Sprintf("https://www.google.com/search?q=%s", escapedQuery)
+	case "duckduck":
+		searchURL = fmt.Sprintf("https://html.duckduckgo.com/html/?q=%s", escapedQuery)
+	default:
+		fmt.Println("Unsupported search engine.")
+		return results
 	}
 
+	c.Visit(searchURL)
+	c.Wait()
+
+	for link := range resultSet {
+		results = append(results, link)
+	}
 	return results
 }
 
 // WHOIS RECON
 func LookupWhois(website string) {
-	result, _ := whois.Whois(website)
+	result, err := whois.Whois(website)
+	if err != nil {
+		fmt.Println("WHOIS lookup failed:", err)
+		return
+	}
+	fmt.Println("WHOIS Lookup result:")
 	fmt.Println(result)
 }
 
@@ -180,7 +179,9 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 	c := colly.NewCollector(
 		colly.MaxDepth(maxDepth),
 		colly.AllowedDomains(domain, "www."+domain),
+		colly.Async(true),
 	)
+	c.Limit(&colly.LimitRule{Parallelism: 10})
 
 	// Regex for emails
 	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@` + regexp.QuoteMeta(domain))
@@ -209,8 +210,9 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 	startURL := "https://" + domain
 	err := c.Visit(startURL)
 	if err != nil {
-		panic(err)
+		fmt.Println("Crawl error:", err)
 	}
+	c.Wait()
 
 	// Convert map to slice
 	var emails []string
@@ -226,8 +228,8 @@ func EmailHunter(domain string, maxDepth int, strict bool) {
 	}
 }
 
-// PORT SCANNER
-func PortScanner(target string, ports []int, timeout time.Duration) {
+// PORT SCANNER (TCP/UDP, concurrent)
+func PortScanner(target string, ports []int, timeout time.Duration, udp bool) {
 	results := make(map[string]string)
 	portsChan := make(chan int, 100)
 	resultsChan := make(chan struct {
@@ -235,35 +237,46 @@ func PortScanner(target string, ports []int, timeout time.Duration) {
 		Banner string
 	}, 100)
 
+	worker := func() {
+		for port := range portsChan {
+			var address string
+			if strings.Contains(target, ":") && !strings.HasPrefix(target, "[") {
+				address = fmt.Sprintf("[%s]:%d", target, port)
+			} else {
+				address = fmt.Sprintf("%s:%d", target, port)
+			}
+			if udp {
+				conn, err := net.DialTimeout("udp", address, timeout)
+				if err == nil {
+					_ = conn.Close()
+					resultsChan <- struct {
+						Port   int
+						Banner string
+					}{port, "open (UDP)"}
+				}
+			} else {
+				conn, err := net.DialTimeout("tcp", address, timeout)
+				if err == nil {
+					_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+					buff := make([]byte, 1024)
+					n, _ := conn.Read(buff)
+					banner := strings.TrimSpace(string(buff[:n]))
+					if banner == "" {
+						banner = "open"
+					}
+					_ = conn.Close()
+					resultsChan <- struct {
+						Port   int
+						Banner string
+					}{port, banner}
+				}
+			}
+		}
+	}
+
 	// Start workers
 	for i := 0; i < 100; i++ {
-		go func() {
-			for port := range portsChan {
-				var address string
-				if strings.Contains(target, ":") && !strings.HasPrefix(target, "[") {
-					address = fmt.Sprintf("[%s]:%d", target, port)
-				} else {
-					address = fmt.Sprintf("%s:%d", target, port)
-				}
-				conn, err := net.DialTimeout("tcp", address, timeout)
-				if err != nil {
-					continue
-				}
-
-				_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-				buff := make([]byte, 1024)
-				n, _ := conn.Read(buff)
-				banner := strings.TrimSpace(string(buff[:n]))
-				if banner == "" {
-					banner = "open"
-				}
-				_ = conn.Close()
-				resultsChan <- struct {
-					Port   int
-					Banner string
-				}{port, banner}
-			}
-		}()
+		go worker()
 	}
 
 	// Feed ports
@@ -278,7 +291,11 @@ func PortScanner(target string, ports []int, timeout time.Duration) {
 	for range ports {
 		select {
 		case r := <-resultsChan:
-			results[fmt.Sprintf("tcp/%d", r.Port)] = r.Banner
+			proto := "tcp"
+			if udp {
+				proto = "udp"
+			}
+			results[fmt.Sprintf("%s/%d", proto, r.Port)] = r.Banner
 		case <-time.After(timeout + 1*time.Second):
 			// Skip timeout ports
 		}
@@ -290,7 +307,7 @@ func PortScanner(target string, ports []int, timeout time.Duration) {
 	}
 }
 
-// HTML EAD ANALYZER
+// HEADER ANALYZER
 func HeaderAnalyzer(target string) {
 	results := make(map[string]string)
 
@@ -307,18 +324,19 @@ func HeaderAnalyzer(target string) {
 	if err != nil {
 		results["error"] = "invalid request"
 		print(results)
+		return
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		results["error"] = "connection failed"
 		print(results)
+		return
 	}
 	defer resp.Body.Close()
 
 	for k, v := range resp.Header {
 		key := strings.ToLower(k)
-
 		// Only extract juicy headers
 		switch key {
 		case "server", "x-powered-by", "set-cookie", "content-type",
