@@ -10,6 +10,7 @@ import (
 	"knife/modules/mobile"
 	"knife/modules/phish"
 	"knife/modules/recon"
+	"knife/modules/vuln"
 	"knife/modules/wifi"
 )
 
@@ -222,8 +223,8 @@ func ReconModule() {
 	recon.Interact(moduleIntNo)
 }
 
-func VulnModule() string {
-	return ""
+func VulnModule() {
+	vuln.Interact()
 }
 
 func WifiModule() {
@@ -296,7 +297,7 @@ func main() {
 		ReconModule()
 
 	case "Web vulnerability":
-		fmt.Println(VulnModule())
+		VulnModule()
 
 	case "Wifi attack":
 		WifiModule()
@@ -305,22 +306,4 @@ func main() {
 		os.Exit(1)
 	}
 
-	// testing the phishing module
-	/*
-		if len(os.Args) >= 4 && os.Args[1] == "phish" {
-			template := os.Args[2]
-			port, _ := strconv.Atoi(os.Args[3])
-			phish.Launch(template, port)
-		}
-	*/
-
-	// testing the vuln scanner movule (doesnt seem to be to through)
-	/*
-		vuln.ScanURL("https://unilorin.edu.ng")
-	*/
-
-	//testing the apk module
-	/*
-		mobile.ParseAPKMeat("/home/christian/archive/codemine/codemine.apk")
-	*/
 }

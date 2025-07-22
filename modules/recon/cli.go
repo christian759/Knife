@@ -96,18 +96,6 @@ func Interact(selectedOption int) {
 		}
 
 	case 6:
-		webAnalyzer := readInput("Enter website to analyze headers (e.g. https://example.com):")
-		headers, err := HeaderAnalyze(webAnalyzer)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		fmt.Println("Interesting headers:")
-		for k, v := range headers {
-			fmt.Printf("%s: %s\n", k, v)
-		}
-
-	case 7:
 		target := readInput("Enter target for port scan (IP or domain):")
 		portsInput := readInput("Enter ports to scan (comma separated, e.g. 80,443,8080):")
 		ports := parsePortsInput(portsInput)
@@ -125,6 +113,18 @@ func Interact(selectedOption int) {
 			for _, r := range results {
 				fmt.Printf("%s/%d: %s\n", r.Proto, r.Port, r.Banner)
 			}
+		}
+
+	case 7:
+		webAnalyzer := readInput("Enter website to analyze headers (e.g. https://example.com):")
+		headers, err := HeaderAnalyze(webAnalyzer)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println("Interesting headers:")
+		for k, v := range headers {
+			fmt.Printf("%s: %s\n", k, v)
 		}
 	default:
 		fmt.Println("Unknown option.")
