@@ -273,7 +273,7 @@ func main() {
 
 	width, _, _ = getTerminalSize()
 
-	file, err := os.ReadFile("standard.txt")
+	file, err := os.ReadFile("letters.txt")
 	if err != nil {
 		fmt.Println(err)
 	}
