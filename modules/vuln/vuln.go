@@ -22,7 +22,7 @@ var vulns = []VulnCheck{
 	{"XSS (Reflected)", "q", "<script>alert(1)</script>", `<script>alert\(1\)</script>`, "GET"},
 	{"SQL Injection (Error-Based)", "id", "' OR '1'='1", `sql syntax|mysql_fetch|ORA-|ODBC|SQLite`, "GET"},
 	{"LFI", "file", "../../../../etc/passwd", `root:x:0:0`, "GET"},
-	{"Open Redirect", "next", "//evil.com", `(?i)Location:\s*https?://evil\.com`, "GET"},
+	{"Open Redirect", "next", "//evil.com", `evil\.com`, "GET"}, // pattern simplified; detection done via Location header
 	{"Command Injection", "ip", "127.0.0.1; cat /etc/passwd", `root:x:0:0`, "GET"},
 	{"SSRF", "url", "http://127.0.0.1:80", `Server|Apache|nginx|Bad Request`, "GET"},
 	{"CSRF", "", "", `Set-Cookie`, "GET"},
@@ -32,7 +32,17 @@ var vulns = []VulnCheck{
 }
 
 func ScanURL(target string, extraHeaders map[string]string, cookies string) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	// default client (follows redirects)
+	defaultClient := &http.Client{Timeout: 15 * time.Second}
+	// client that does NOT follow redirects (useful for open-redirect detection)
+	noRedirectClient := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// do not follow redirects, return special error to stop following
+			return http.ErrUseLastResponse
+		},
+	}
+
 	fmt.Println("[+] Starting scan:", target)
 	found := false
 
@@ -46,14 +56,27 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 		var req *http.Request
 		var testURL string
 
+		// Build request
 		if check.Method == "POST" {
-			data := url.Values{}
-			if check.Param != "" {
-				data.Set(check.Param, check.Payload)
+			// If payload looks like XML/XXE, send raw XML with proper content-type.
+			payloadIsXML := strings.Contains(strings.TrimSpace(check.Payload), "<?xml") || strings.Contains(check.Payload, "<!DOCTYPE")
+			if payloadIsXML && check.Param == "xml" {
+				req, err = http.NewRequest("POST", target, strings.NewReader(check.Payload))
+				if err == nil {
+					req.Header.Set("Content-Type", "application/xml")
+				}
+				testURL = target + " (POST raw XML payload)"
+			} else {
+				data := url.Values{}
+				if check.Param != "" {
+					data.Set(check.Param, check.Payload)
+				}
+				req, err = http.NewRequest("POST", target, strings.NewReader(data.Encode()))
+				if err == nil {
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				}
+				testURL = target + " (POST param: " + check.Param + "=" + check.Payload + ")"
 			}
-			req, err = http.NewRequest("POST", target, strings.NewReader(data.Encode()))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			testURL = target + " (POST param: " + check.Param + "=" + check.Payload + ")"
 		} else {
 			q := u.Query()
 			if check.Param != "" {
@@ -77,27 +100,73 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 			req.Header.Set("Cookie", cookies)
 		}
 
+		// Choose client: use noRedirectClient only when testing open-redirect so we can inspect Location header.
+		client := defaultClient
+		if check.Name == "Open Redirect" {
+			client = noRedirectClient
+		}
+
 		resp, err := client.Do(req)
 		if err != nil {
+			// note: http.ErrUseLastResponse is not returned here because client.Do returns a response in that case.
 			fmt.Printf("[-] %s request failed: %v\n", check.Name, err)
 			continue
 		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
 
-		bodyStr := strings.ToLower(string(body))
-		matchPattern := strings.ToLower(check.Match)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			fmt.Printf("[-] Error reading response for %s: %v\n", check.Name, err)
+			continue
+		}
+		bodyStr := string(bodyBytes)
+
+		// build header string (original case) for regex checks where needed
 		headerStr := ""
 		for k, v := range resp.Header {
 			headerStr += fmt.Sprintf("%s: %s\n", k, strings.Join(v, ","))
 		}
 
-		// Use regex for matching
-		matched, _ := regexp.MatchString(matchPattern, bodyStr)
-		headerMatched, _ := regexp.MatchString(matchPattern, strings.ToLower(headerStr))
+		// Special-case: Open Redirect detection — inspect Location header directly
+		if check.Name == "Open Redirect" {
+			loc := resp.Header.Get("Location")
+			// handle protocol-relative "//evil.com" and absolute "http://evil.com" etc.
+			if loc != "" {
+				lowerLoc := strings.ToLower(strings.TrimSpace(loc))
+				if strings.HasPrefix(lowerLoc, "//evil.com") ||
+					strings.Contains(lowerLoc, "://evil.com") ||
+					strings.Contains(lowerLoc, "evil.com") {
+					fmt.Printf("[!] Potential %-30s | Param: %-10s | Method: %-4s | Status: %d | URL: %s | Location: %s\n",
+						check.Name, check.Param, check.Method, resp.StatusCode, testURL, loc)
+					found = true
+					// go to next check after reporting open redirect
+					continue
+				}
+			}
+			// If no header matched, also fall through to generic regex checks below (optional)
+		}
 
-		if matched || headerMatched {
-			fmt.Printf("[!] Potential %-30s | Param: %-10s | Method: %-4s | Status: %d | URL: %s\n", check.Name, check.Param, check.Method, resp.StatusCode, testURL)
+		// Prepare regex for matching. Use case-insensitive by prefixing (?i) unless already provided.
+		pat := check.Match
+		if pat == "" {
+			pat = "(?i)" // match nothing special but still valid regex
+		}
+		if !strings.HasPrefix(pat, "(?i)") && !strings.HasPrefix(pat, "(?-i)") {
+			pat = "(?i)" + pat
+		}
+
+		re, err := regexp.Compile(pat)
+		if err != nil {
+			fmt.Printf("[-] Invalid regex for %s: %v\n", check.Name, err)
+			continue
+		}
+
+		bodyMatched := re.MatchString(bodyStr)
+		headerMatched := re.MatchString(headerStr)
+
+		if bodyMatched || headerMatched {
+			fmt.Printf("[!] Potential %-30s | Param: %-10s | Method: %-4s | Status: %d | URL: %s\n",
+				check.Name, check.Param, check.Method, resp.StatusCode, testURL)
 			found = true
 		}
 	}
