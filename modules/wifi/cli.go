@@ -198,20 +198,58 @@ func PmkidHandle() {
 }
 
 func SnifferHandle() {
-	fmt.Print("Interface: ")
-	iface, _ := reader.ReadString('\n')
-	iface = strings.TrimSpace(iface)
+	ifaces, err := GetWirelessInterfaces()
+	if err != nil {
+		fmt.Println("Error detecting wireless interfaces:", err)
+		return
+	}
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
+	}
+
+	// Show available interfaces
+	fmt.Println("Detected interfaces:")
+	for i, ifn := range ifaces {
+		fmt.Printf("  [%d] %s\n", i+1, ifn)
+	}
+	fmt.Printf("Select interface number (press Enter for %s): ", ifaces[0])
+
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(choice)
+
+	// Choose one interface
+	selected := ifaces[0]
+	if choice != "" {
+		if idx, err := strconv.Atoi(choice); err == nil && idx >= 1 && idx <= len(ifaces) {
+			selected = ifaces[idx-1]
+		} else {
+			fmt.Println("Invalid selection, using default:", selected)
+		}
+	}
+
+	fmt.Printf("Using interface: %s\n", selected)
+
+	// Ask for mode
 	fmt.Print("Sniff probe requests only? (Y/N): ")
 	ans, _ := reader.ReadString('\n')
 	ans = strings.TrimSpace(ans)
-	if ans == "Y" || ans == "y" {
+
+	// Timeout input if probe-only mode
+	if strings.EqualFold(ans, "y") {
 		fmt.Print("Timeout (seconds): ")
 		timeoutStr, _ := reader.ReadString('\n')
 		timeoutStr = strings.TrimSpace(timeoutStr)
-		timeout, _ := strconv.Atoi(timeoutStr)
-		SniffProbes(iface, time.Duration(timeout)*time.Second)
+		timeout, err := strconv.Atoi(timeoutStr)
+		if err != nil || timeout <= 0 {
+			fmt.Println("Invalid timeout, defaulting to 10 seconds.")
+			timeout = 10
+		}
+		fmt.Printf("Sniffing probe requests on %s for %d seconds...\n", selected, timeout)
+		SniffProbes(selected, time.Duration(timeout)*time.Second)
 	} else {
-		StartPacketSniffer(iface)
+		fmt.Printf("Starting full packet sniffer on %s (Ctrl+C to stop)...\n", selected)
+		StartPacketSniffer(selected)
 	}
 }
 
