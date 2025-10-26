@@ -9,7 +9,6 @@ import (
 
 	"knife/modules/mobile"
 	"knife/modules/phish"
-	"knife/modules/recon"
 	"knife/modules/vuln"
 	"knife/modules/wifi"
 )
@@ -19,7 +18,6 @@ var width int
 var Modules = []string{
 	"Mobile attack",
 	"Phishing",
-	"Reconnaissance",
 	"Web vulnerability",
 	"Wifi attack",
 }
@@ -35,16 +33,6 @@ var TrickPhishTemp = []string{
 	"Instagram",
 	"Netflix",
 	"Outlook",
-}
-
-var TrickRecon = []string{
-	"Search users",
-	"Dork searching",
-	"Whois",
-	"Dns reconnaissance",
-	"Email hunter",
-	"Port scanner",
-	"Header analyzer",
 }
 
 var TrickWifi = []string{
@@ -204,25 +192,6 @@ func PhishModule() {
 	phish.Interact(moduleIntNo)
 }
 
-func ReconModule() {
-	for index, module := range TrickRecon {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(TrickRecon) {
-		fmt.Println("Choice out of range")
-		return
-	}
-
-	recon.Interact(moduleIntNo)
-}
-
 func VulnModule() {
 	vuln.Interact()
 }
@@ -292,9 +261,6 @@ func main() {
 
 	case "Phishing":
 		PhishModule()
-
-	case "Reconnaissance":
-		ReconModule()
 
 	case "Web vulnerability":
 		VulnModule()
