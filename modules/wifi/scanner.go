@@ -24,7 +24,7 @@ func ScanNetworks(iface string) ([]string, error) {
 			continue
 		}
 		ssid := strings.TrimSpace(strings.Replace(l, "SSID:", "", 1))
-		if ssid != "" {
+		if ssid != "" && ssid != "* SSID List" {
 			ssids = append(ssids, ssid)
 		}
 	}
