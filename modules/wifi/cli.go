@@ -28,7 +28,7 @@ func Interact(choice string) {
 		InterfaceHandle()
 	case "Mac Spoofer":
 		MacSpooferHandle()
-	case "Pmkid":
+	case "PmKid":
 		PmkidHandle()
 	case "Sniffer":
 		SnifferHandle()
@@ -179,9 +179,38 @@ func MacSpooferHandle() {
 }
 
 func PmkidHandle() {
-	fmt.Print("Interface: ")
-	iface, _ := reader.ReadString('\n')
-	iface = strings.TrimSpace(iface)
+	ifaces, err := GetWirelessInterfaces()
+	if err != nil {
+		fmt.Println("Error detecting wireless interfaces:", err)
+		return
+	}
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
+	}
+
+	// Show available interfaces
+	fmt.Println("Detected interfaces:")
+	for i, ifn := range ifaces {
+		fmt.Printf("  [%d] %s\n", i+1, ifn)
+	}
+	fmt.Printf("Select interface number (press Enter for %s): ", ifaces[0])
+
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(choice)
+
+	// Choose one interface
+	selected := ifaces[0]
+	if choice != "" {
+		if idx, err := strconv.Atoi(choice); err == nil && idx >= 1 && idx <= len(ifaces) {
+			selected = ifaces[idx-1]
+		} else {
+			fmt.Println("Invalid selection, using default:", selected)
+		}
+	}
+
+	fmt.Printf("Using interface: %s\n", selected)
+
 	fmt.Print("Output file: ")
 	file, _ := reader.ReadString('\n')
 	file = strings.TrimSpace(file)
@@ -189,7 +218,7 @@ func PmkidHandle() {
 	timeoutStr, _ := reader.ReadString('\n')
 	timeoutStr = strings.TrimSpace(timeoutStr)
 	timeout, _ := strconv.Atoi(timeoutStr)
-	err := CapturePMKID(iface, file, time.Duration(timeout)*time.Second)
+	err = CapturePMKID(selected, file, time.Duration(timeout)*time.Second)
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
