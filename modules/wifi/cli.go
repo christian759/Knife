@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func Interact(choice string) {
 	case "Sniffer":
 		SnifferHandle()
 	case "Scanner":
-		ScannerHandle()
+		ScannerHandleConcurrent()
 	default:
 		fmt.Println("Unknown option:", choice)
 	}
@@ -214,7 +215,7 @@ func SnifferHandle() {
 	}
 }
 
-func ScannerHandle() {
+func ScannerHandleConcurrent() {
 	ifaces, err := GetWirelessInterfaces()
 	if err != nil {
 		fmt.Println("Error detecting wireless interfaces:", err)
@@ -226,31 +227,28 @@ func ScannerHandle() {
 	}
 
 	fmt.Println("Detected interfaces:", strings.Join(ifaces, ", "))
-	ScanAndPrintAll(ifaces)
 
-	// Ask user if they want continuous scanning + optional channel hopping.
-	ans := Prompt("\nContinuous scan with channel hopping across all interfaces? (Y/N): ")
-	if strings.EqualFold(ans, "y") {
-		delayStr := Prompt("Hop delay in ms (e.g. 500): ")
-		delayMs, err := strconv.Atoi(delayStr)
-		if err != nil || delayMs <= 0 {
-			fmt.Println("Invalid delay; using 500ms.")
-			delayMs = 500
-		}
-		delay := time.Duration(delayMs) * time.Millisecond
-
-		// channels to hop — you can change or extend this slice
-		channels := []int{1, 6, 11, 3, 9, 13, 2, 10, 7, 4, 5, 8, 12, 14}
-		fmt.Println("Starting continuous scan. Press Ctrl+C to stop.")
-		for {
-			// hop each interface sequentially (simple approach)
-			for _, ch := range channels {
-				for _, iface := range ifaces {
-					_ = ChannelHopSingle(iface, ch) // ignore hop errors here
-				}
-				ScanAndPrintAll(ifaces)
-				time.Sleep(delay)
+	var wg sync.WaitGroup
+	for _, iface := range ifaces {
+		wg.Add(1)
+		go func(ifn string) {
+			defer wg.Done()
+			fmt.Printf("\n--- Interface: %s ---\n", ifn)
+			ssids, err := ScanNetworks(ifn)
+			if err != nil {
+				fmt.Println("Scan error:", err)
+				return
 			}
-		}
+			if len(ssids) == 0 {
+				fmt.Println("No SSIDs found.")
+				return
+			}
+			fmt.Println("Found SSIDs:")
+			for _, s := range ssids {
+				fmt.Println("-", s)
+			}
+		}(iface)
 	}
+	wg.Wait()
+	fmt.Println("\nFinished concurrent single-pass scan.")
 }
