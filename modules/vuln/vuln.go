@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// --- existing types (kept) ---
+// --- types ---
 type VulnCheck struct {
 	Name    string
 	Param   string
@@ -23,7 +23,7 @@ var vulns = []VulnCheck{
 	{"XSS (Reflected)", "q", "<script>alert(1)</script>", `<script>alert\(1\)</script>`, "GET"},
 	{"SQL Injection (Error-Based)", "id", "' OR '1'='1", `sql syntax|mysql_fetch|ORA-|ODBC|SQLite`, "GET"},
 	{"LFI", "file", "../../../../etc/passwd", `root:x:0:0`, "GET"},
-	{"Open Redirect", "next", "//evil.com", `evil\.com`, "GET"}, // detection done via Location header
+	{"Open Redirect", "next", "//evil.com", `evil\.com`, "GET"},
 	{"Command Injection", "ip", "127.0.0.1; cat /etc/passwd", `root:x:0:0`, "GET"},
 	{"SSRF", "url", "http://127.0.0.1:80", `Server|Apache|nginx|Bad Request`, "GET"},
 	{"CSRF", "", "", `Set-Cookie`, "GET"},
@@ -32,7 +32,6 @@ var vulns = []VulnCheck{
 	{"XXE", "xml", `<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`, `root:x:0:0`, "POST"},
 }
 
-// --- new types for reporting ---
 type Finding struct {
 	Name          string
 	Param         string
@@ -50,15 +49,17 @@ type Finding struct {
 
 var findings []Finding
 
-// ScanURL runs checks and records findings to the global 'findings' slice.
-func ScanURL(target string, extraHeaders map[string]string, cookies string) {
-	// default client (follows redirects)
+// ScanURL runs the checks and automatically writes an HTML report at the end.
+// pass reportFilename as desired (e.g. "report.html"); if empty, a timestamped filename will be generated.
+func ScanURL(target string, extraHeaders map[string]string, cookies string, reportFilename string) error {
+	// reset findings for each run
+	findings = []Finding{}
+
+	// clients
 	defaultClient := &http.Client{Timeout: 15 * time.Second}
-	// client that does NOT follow redirects (useful for open-redirect detection)
 	noRedirectClient := &http.Client{
 		Timeout: 15 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// do not follow redirects
 			return http.ErrUseLastResponse
 		},
 	}
@@ -69,16 +70,13 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 	for _, check := range vulns {
 		u, err := url.Parse(target)
 		if err != nil {
-			fmt.Printf("[-] Invalid URL: %s\n", target)
-			return
+			return fmt.Errorf("invalid URL: %w", err)
 		}
 
 		var req *http.Request
 		var testURL string
 
-		// Build request
 		if check.Method == "POST" {
-			// If payload looks like XML/XXE, send raw XML with proper content-type.
 			payloadIsXML := strings.Contains(strings.TrimSpace(check.Payload), "<?xml") || strings.Contains(check.Payload, "<!DOCTYPE")
 			if payloadIsXML && check.Param == "xml" {
 				req, err = http.NewRequest("POST", target, strings.NewReader(check.Payload))
@@ -112,7 +110,6 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 			continue
 		}
 
-		// Add custom headers if provided
 		for k, v := range extraHeaders {
 			req.Header.Set(k, v)
 		}
@@ -120,7 +117,6 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 			req.Header.Set("Cookie", cookies)
 		}
 
-		// Choose client: use noRedirectClient only when testing open-redirect so we can inspect Location header.
 		client := defaultClient
 		if check.Name == "Open Redirect" {
 			client = noRedirectClient
@@ -140,13 +136,12 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 		}
 		bodyStr := string(bodyBytes)
 
-		// build header string (original case) for regex checks where needed
 		headerStr := ""
 		for k, v := range resp.Header {
 			headerStr += fmt.Sprintf("%s: %s\n", k, strings.Join(v, ","))
 		}
 
-		// Special-case: Open Redirect detection — inspect Location header directly
+		// Open redirect special case
 		if check.Name == "Open Redirect" {
 			loc := resp.Header.Get("Location")
 			if loc != "" {
@@ -175,13 +170,11 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 					continue
 				}
 			}
-			// If no header matched, fall through to generic regex checks below
 		}
 
-		// Prepare regex for matching. Use case-insensitive by prefixing (?i) unless already provided.
 		pat := check.Match
 		if pat == "" {
-			pat = "(?i)" // match nothing special but still valid regex
+			pat = "(?i)"
 		}
 		if !strings.HasPrefix(pat, "(?i)") && !strings.HasPrefix(pat, "(?-i)") {
 			pat = "(?i)" + pat
@@ -197,7 +190,6 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 		headerMatched := re.MatchString(headerStr)
 
 		if bodyMatched || headerMatched {
-			// extract small evidence snippet
 			ev := ""
 			if bodyMatched {
 				ev = findRegexSnippet(re, bodyStr, 200)
@@ -219,7 +211,7 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 				HeaderSnippet: snippet(headerStr, 800),
 				BodySnippet:   snippet(bodyStr, 800),
 				Evidence:      ev,
-				Notes:         "", // placeholder; could be filled with contextual info later
+				Notes:         "",
 				Timestamp:     time.Now(),
 			}
 			findings = append(findings, f)
@@ -232,4 +224,11 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string) {
 	} else {
 		fmt.Println("[!] Scan complete. Review findings above.")
 	}
+
+	// Write report automatically
+	if err := WriteReport(reportFilename); err != nil {
+		return fmt.Errorf("scan finished but failed to write report: %w", err)
+	}
+
+	return nil
 }
