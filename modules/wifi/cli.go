@@ -215,48 +215,42 @@ func SnifferHandle() {
 }
 
 func ScannerHandle() {
-	fmt.Print("Interface: ")
-	iface, _ := reader.ReadString('\n')
-	iface = strings.TrimSpace(iface)
-	ssids, err := ScanNetworks(iface)
+	ifaces, err := GetWirelessInterfaces()
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Error detecting wireless interfaces:", err)
 		return
 	}
-	fmt.Println("Found SSIDs:")
-	for _, ssid := range ssids {
-		fmt.Println("-", ssid)
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
 	}
-	fmt.Print("Channel hop? (Y/N): ")
-	ans, _ := reader.ReadString('\n')
-	ans = strings.TrimSpace(ans)
-	if ans == "Y" || ans == "y" {
-		fmt.Print("Hop delay (ms): ")
-		delayStr, _ := reader.ReadString('\n')
-		delayStr = strings.TrimSpace(delayStr)
-		delay, _ := strconv.Atoi(delayStr)
-		fmt.Println("Channel hopping. Press Ctrl+C to stop.")
+
+	fmt.Println("Detected interfaces:", strings.Join(ifaces, ", "))
+	ScanAndPrintAll(ifaces)
+
+	// Ask user if they want continuous scanning + optional channel hopping.
+	ans := Prompt("\nContinuous scan with channel hopping across all interfaces? (Y/N): ")
+	if strings.EqualFold(ans, "y") {
+		delayStr := Prompt("Hop delay in ms (e.g. 500): ")
+		delayMs, err := strconv.Atoi(delayStr)
+		if err != nil || delayMs <= 0 {
+			fmt.Println("Invalid delay; using 500ms.")
+			delayMs = 500
+		}
+		delay := time.Duration(delayMs) * time.Millisecond
+
+		// channels to hop — you can change or extend this slice
+		channels := []int{1, 6, 11, 3, 9, 13, 2, 10, 7, 4, 5, 8, 12, 14}
+		fmt.Println("Starting continuous scan. Press Ctrl+C to stop.")
 		for {
-			ssids, err := ScanNetworks(iface)
-			if err != nil {
-				fmt.Println("Error:", err)
-			} else {
-				fmt.Println("Found SSIDs:")
-				for _, ssid := range ssids {
-					fmt.Println("-", ssid)
+			// hop each interface sequentially (simple approach)
+			for _, ch := range channels {
+				for _, iface := range ifaces {
+					_ = ChannelHopSingle(iface, ch) // ignore hop errors here
 				}
+				ScanAndPrintAll(ifaces)
+				time.Sleep(delay)
 			}
-			time.Sleep(time.Duration(delay) * time.Millisecond)
-		}
-	} else {
-		ssids, err := ScanNetworks(iface)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		fmt.Println("Found SSIDs:")
-		for _, ssid := range ssids {
-			fmt.Println("-", ssid)
 		}
 	}
 }
