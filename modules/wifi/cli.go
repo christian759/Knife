@@ -155,8 +155,16 @@ func InterfaceHandle() {
 }
 
 func MacSpooferHandle() {
-	fmt.Print("Interface: ")
-	iface, _ := reader.ReadString('\n')
+	ifaces, err := GetWirelessInterfaces()
+	if err != nil {
+		fmt.Println("Error detecting wireless interfaces:", err)
+		return
+	}
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
+	}
+	var iface = ifaces[0] // using the first interface by default
 	iface = strings.TrimSpace(iface)
 	fmt.Print("Randomize MAC? (Y/N): ")
 	ans, _ := reader.ReadString('\n')
