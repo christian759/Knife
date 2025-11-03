@@ -28,7 +28,12 @@ func ListInterfaces() ([]string, error) {
 	return lines, nil
 }
 
-func EnableMonitorMode(iface string) error {
+func EnableMonitorMode() error {
+	ifaces, err := ListInterfaces()
+	if err != nil {
+		fmt.Println(err)
+	}
+	var iface string = ifaces[0]
 	commands := []string{
 		"ip link set " + iface + " down",
 		"iw dev " + iface + " set type monitor",
@@ -42,7 +47,12 @@ func EnableMonitorMode(iface string) error {
 	return nil
 }
 
-func RestoreManagedMode(iface string) error {
+func RestoreManagedMode() error {
+	ifaces, err := ListInterfaces()
+	if err != nil {
+		fmt.Println(err)
+	}
+	var iface string = ifaces[0]
 	commands := []string{
 		"ip link set " + iface + " down",
 		"iw dev " + iface + " set type managed",
@@ -79,9 +89,9 @@ func HandleWifiAction(action, iface string) error {
 		}
 		fmt.Println("Available interfaces:", interfaces)
 	case "Enable Monitor Mode":
-		return EnableMonitorMode(iface)
+		return EnableMonitorMode()
 	case "Restore Managed Mode":
-		return RestoreManagedMode(iface)
+		return RestoreManagedMode()
 	case "Start Packet Sniffer":
 		StartPacketSniffer(iface)
 	default:
