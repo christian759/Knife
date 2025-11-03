@@ -155,6 +155,7 @@ func InterfaceHandle() {
 }
 
 func MacSpooferHandle() {
+	// detect wireless interfaces (assumes GetWirelessInterfaces() exists)
 	ifaces, err := GetWirelessInterfaces()
 	if err != nil {
 		fmt.Println("Error detecting wireless interfaces:", err)
@@ -164,24 +165,51 @@ func MacSpooferHandle() {
 		fmt.Println("No wireless interfaces detected.")
 		return
 	}
-	var iface = ifaces[0] // using the first interface by default
-	iface = strings.TrimSpace(iface)
-	fmt.Print("Randomize MAC? (Y/N): ")
-	ans, _ := reader.ReadString('\n')
-	ans = strings.TrimSpace(ans)
-	if ans == "Y" || ans == "y" {
-		mac, err := RandomMAC(iface)
-		if err != nil {
-			fmt.Println("Error:", err)
-		} else {
-			fmt.Println("New MAC:", mac)
-		}
-	} else {
-		mac, err := GetCurrentMAC(iface)
-		if err != nil {
-			fmt.Println("Error:", err)
-		} else {
-			fmt.Println("Current MAC:", mac)
+
+	// use the first wireless interface by default
+	iface := strings.TrimSpace(ifaces[0])
+	fmt.Println("Using interface:", iface)
+
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("Choose action — Randomize MAC (R) / Show current MAC (S) / Quit (Q): ")
+		raw, _ := reader.ReadString('\n')
+		choice := strings.ToLower(strings.TrimSpace(raw))
+
+		switch choice {
+		case "r", "random", "randomize":
+			fmt.Println("Randomizing MAC... (requires root)")
+			newMac, err := RandomMAC(iface)
+			if err != nil {
+				fmt.Println("Error randomizing MAC:", err)
+			} else {
+				// verify readback
+				curr, cerr := GetCurrentMAC(iface)
+				if cerr != nil {
+					fmt.Printf("New MAC (reported): %s — but verification failed: %v\n", newMac, cerr)
+				} else {
+					fmt.Printf("New MAC: %s (verified: %s)\n", newMac, curr)
+				}
+			}
+			return
+
+		case "s", "show", "current":
+			mac, err := GetCurrentMAC(iface)
+			if err != nil {
+				fmt.Println("Error reading current MAC:", err)
+			} else {
+				fmt.Println("Current MAC:", mac)
+			}
+			return
+
+		case "q", "quit", "exit":
+			fmt.Println("Cancelled.")
+			return
+
+		default:
+			fmt.Println("Unrecognized choice. Please enter R, S, or Q.")
+			// loop and prompt again
 		}
 	}
 }
