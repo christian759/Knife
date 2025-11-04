@@ -39,7 +39,7 @@ func Interact(choice string) {
 	}
 }
 
-// Deauth attack handler
+// DeauthHandle - auto-scans for BSSID and then prompts for target + count
 func DeauthHandle() {
 	// detect wireless interfaces
 	ifaces, err := GetWirelessInterfaces()
@@ -54,9 +54,35 @@ func DeauthHandle() {
 	// use the first wireless interface by default
 	iface := strings.TrimSpace(ifaces[0])
 
-	fmt.Print("BSSID (AP MAC): ")
-	bssid, _ := reader.ReadString('\n')
-	bssid = strings.TrimSpace(bssid)
+	// Run a scan and pick the strongest AP
+	fmt.Printf("Scanning for nearby APs on interface %s (this may require sudo)...\n", iface)
+	aps, err := scanAPs(iface)
+	if err != nil {
+		fmt.Printf("Scan failed: %v\n", err)
+		return
+	}
+	if len(aps) == 0 {
+		fmt.Println("No APs found during scan. Make sure your interface is up and you have permission to scan.")
+		return
+	}
+
+	// choose the AP with the best (largest) signal value (remember -30 > -80)
+	best := aps[0]
+	for _, a := range aps[1:] {
+		if a.Signal > best.Signal {
+			best = a
+		}
+	}
+
+	chosenBSSID := strings.ToLower(strings.TrimSpace(best.BSSID))
+	displaySSID := best.SSID
+	if displaySSID == "" {
+		displaySSID = "<hidden>"
+	}
+	fmt.Printf("Auto-selected BSSID: %s  (SSID: %s, signal: %.1f dBm)\n", chosenBSSID, displaySSID, best.Signal)
+
+	// Prompt for remaining inputs (target + count)
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Target MAC (or ff:ff:ff:ff:ff:ff for broadcast): ")
 	target, _ := reader.ReadString('\n')
 	target = strings.TrimSpace(target)
@@ -64,7 +90,9 @@ func DeauthHandle() {
 	countStr, _ := reader.ReadString('\n')
 	countStr = strings.TrimSpace(countStr)
 	count, _ := strconv.Atoi(countStr)
-	err = DeauthAttack(iface, bssid, target, count)
+
+	// Call your DeauthAttack (should be the harmless simulator)
+	err = DeauthAttack(iface, chosenBSSID, target, count)
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
