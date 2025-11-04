@@ -114,6 +114,113 @@ func EvilTwinHandle() {
 }
 
 func GeoloacateHandle() {
+	// detect wireless interfaces
+	ifaces, err := GetWirelessInterfaces()
+	if err != nil {
+		fmt.Println("Error detecting wireless interfaces:", err)
+		return
+	}
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
+	}
+	iface := strings.TrimSpace(ifaces[0])
+
+	fmt.Printf("Scanning for nearby APs on %s (this may require sudo)...\n", iface)
+	aps, err := scanAPs(iface)
+	if err != nil {
+		fmt.Printf("Scan failed: %v\n", err)
+		// fallback to manual input like your original flow
+		fallbackManualGeolocate()
+		return
+	}
+	if len(aps) == 0 {
+		fmt.Println("No APs found during scan. Falling back to manual input.")
+		fallbackManualGeolocate()
+		return
+	}
+
+	// show the list
+	fmt.Println("Found APs:")
+	for i, a := range aps {
+		ssid := a.SSID
+		if ssid == "" {
+			ssid = "<hidden>"
+		}
+		fmt.Printf("%2d) BSSID: %s  SSID: %s  Signal: %.1f dBm\n", i+1, a.BSSID, ssid, a.Signal)
+	}
+
+	// prompt selection
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Select AP by number (1-%d) or enter 'm' for manual MAC: ", len(aps))
+	choiceRaw, _ := reader.ReadString('\n')
+	choiceRaw = strings.TrimSpace(choiceRaw)
+
+	var mac string
+	if strings.EqualFold(choiceRaw, "m") || choiceRaw == "" {
+		// manual entry
+		fmt.Print("MAC address (BSSID): ")
+		mac, _ = reader.ReadString('\n')
+		mac = strings.TrimSpace(mac)
+	} else {
+		idx, err := strconv.Atoi(choiceRaw)
+		if err != nil || idx < 1 || idx > len(aps) {
+			fmt.Println("Invalid selection. Falling back to manual entry.")
+			fmt.Print("MAC address (BSSID): ")
+			mac, _ = reader.ReadString('\n')
+			mac = strings.TrimSpace(mac)
+		} else {
+			mac = aps[idx-1].BSSID
+			fmt.Printf("Selected BSSID: %s (SSID: %s)\n", mac, func() string {
+				if aps[idx-1].SSID == "" {
+					return "<hidden>"
+				}
+				return aps[idx-1].SSID
+			}())
+		}
+	}
+
+	// ask for signal strength
+	fmt.Print("Signal strength (dBm): ")
+	signalStr, _ := reader.ReadString('\n')
+	signalStr = strings.TrimSpace(signalStr)
+	signal, err := strconv.Atoi(signalStr)
+	if err != nil {
+		// if user left blank, try to match to detected AP signal (best effort)
+		found := false
+		for _, a := range aps {
+			if strings.EqualFold(a.BSSID, mac) {
+				signal = int(a.Signal)
+				found = true
+				break
+			}
+		}
+		if !found {
+			fmt.Println("Invalid or missing signal value; aborting.")
+			return
+		} else {
+			fmt.Printf("Using detected signal: %d dBm\n", signal)
+		}
+	}
+
+	// API key
+	fmt.Print("Google API Key: ")
+	apiKey, _ := reader.ReadString('\n')
+	apiKey = strings.TrimSpace(apiKey)
+
+	// Build request and call Geolocate. This uses your existing WiFiAccessPoint type.
+	req := []WiFiAccessPoint{{MacAddress: mac, SignalStrength: signal}}
+	resp, err := Geolocate(req, apiKey)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Printf("Lat: %.6f, Lng: %.6f (Accuracy: %.2fm)\n", resp.Location.Lat, resp.Location.Lng, resp.Accuracy)
+}
+
+// fallbackManualGeolocate keeps original behavior if scanning isn't available
+func fallbackManualGeolocate() {
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("MAC address (BSSID): ")
 	mac, _ := reader.ReadString('\n')
 	mac = strings.TrimSpace(mac)
