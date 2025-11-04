@@ -41,9 +41,19 @@ func Interact(choice string) {
 
 // Deauth attack handler
 func DeauthHandle() {
-	fmt.Print("Interface: ")
-	iface, _ := reader.ReadString('\n')
-	iface = strings.TrimSpace(iface)
+	// detect wireless interfaces
+	ifaces, err := GetWirelessInterfaces()
+	if err != nil {
+		fmt.Println("Error detecting wireless interfaces:", err)
+		return
+	}
+	if len(ifaces) == 0 {
+		fmt.Println("No wireless interfaces detected.")
+		return
+	}
+	// use the first wireless interface by default
+	iface := strings.TrimSpace(ifaces[0])
+
 	fmt.Print("BSSID (AP MAC): ")
 	bssid, _ := reader.ReadString('\n')
 	bssid = strings.TrimSpace(bssid)
@@ -54,7 +64,7 @@ func DeauthHandle() {
 	countStr, _ := reader.ReadString('\n')
 	countStr = strings.TrimSpace(countStr)
 	count, _ := strconv.Atoi(countStr)
-	err := DeauthAttack(iface, bssid, target, count)
+	err = DeauthAttack(iface, bssid, target, count)
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
@@ -155,7 +165,7 @@ func InterfaceHandle() {
 }
 
 func MacSpooferHandle() {
-	// detect wireless interfaces (assumes GetWirelessInterfaces() exists)
+	// detect wireless interfaces
 	ifaces, err := GetWirelessInterfaces()
 	if err != nil {
 		fmt.Println("Error detecting wireless interfaces:", err)

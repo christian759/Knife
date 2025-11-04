@@ -37,3 +37,12 @@ Captured:
   - Password:   Onosedifo_!
 
 -------------------------------
+[+] New Hit (2025-11-04T19:18:04+01:00)
+IP: 127.0.0.1
+Location: , ,  (Lat: 0.0000, Lon: 0.0000, ISP: )
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0
+Captured:
+  - Email/User: christian4onos4mine@gmail.com
+  - Password:   lovemeverymuch
+
+-------------------------------
