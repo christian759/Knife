@@ -36,27 +36,6 @@ func ChannelHopSingle(iface string, ch int) error {
 	return exec.Command("bash", "-c", fmt.Sprintf("iwconfig %s channel %d", iface, ch)).Run()
 }
 
-// GetWirelessInterfaces returns a slice of wireless interface names (wlan0, wlp2s0, etc).
-func GetWirelessInterfaces() ([]string, error) {
-	cmd := exec.Command("bash", "-c", "iw dev | grep Interface | awk '{print $2}'")
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	raw := strings.TrimSpace(string(out))
-	if raw == "" {
-		return nil, nil
-	}
-	lines := strings.Split(raw, "\n")
-	var ifaces []string
-	for _, l := range lines {
-		if t := strings.TrimSpace(l); t != "" {
-			ifaces = append(ifaces, t)
-		}
-	}
-	return ifaces, nil
-}
-
 // ScanAndPrintAll scans all provided interfaces and prints found SSIDs.
 func ScanAndPrintAll(ifaces []string) {
 	if len(ifaces) == 0 {
