@@ -3,276 +3,133 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/lipgloss"
 
 	"knife/modules/mobile"
 	"knife/modules/phish"
 	"knife/modules/vuln"
 	"knife/modules/wifi"
+	"knife/tui"
 )
 
-var width int
+const (
+	ModuleMobile = "Mobile attack"
+	ModulePhish  = "Phishing"
+	ModuleVuln   = "Web vulnerability"
+	ModuleWifi   = "Wifi attack"
+)
 
-var Modules = []string{
-	"Mobile attack",
-	"Phishing",
-	"Web vulnerability",
-	"Wifi attack",
+type moduleItem struct {
+	title       string
+	description string
 }
 
-var TrickMobile = []string{
-	"Injector",
-	"Recon",
-	"Monitor",
+func (i moduleItem) Title() string       { return i.title }
+func (i moduleItem) Description() string { return i.description }
+func (i moduleItem) FilterValue() string { return i.title }
+
+type mainModel struct {
+	list   list.Model
+	chosen string
+	quit   bool
 }
 
-var TrickPhishTemp = []string{
-	"Facebook",
-	"Gmail",
-	"Instagram",
-	"Netflix",
-	"Outlook",
+func (m mainModel) Init() tea.Cmd {
+	return nil
 }
 
-var TrickWifi = []string{
-	"Deauth",
-	"Evil Twin",
-	"Geo-locate",
-	"HandShake",
-	"Injector",
-	"Interface",
-	"Mac Spoofer",
-	"PmKid",
-	"Sniffer",
-	"Scanner",
-}
-
-var SelectedModule string
-
-// getting terminal size
-func getTerminalSize() (int, int, error) {
-	cmd := exec.Command("stty", "size")
-	cmd.Stdin = os.Stdin
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	size := strings.Split(string(out), " ")
-	width, err := strconv.Atoi(strings.TrimSpace(size[1]))
-	if err != nil {
-		return 0, 0, err
-	}
-
-	height, err := strconv.Atoi(strings.TrimSpace(size[0]))
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return width, height, nil
-}
-
-// printing the bold title(knife)
-func printAsciiArtAlign(sentences []string, textFile []string, position string, w int) {
-	for i, word := range sentences {
-		if word == "" {
-			if i != 0 {
-				fmt.Println()
+func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			m.quit = true
+			return m, tea.Quit
+		case "enter":
+			if i, ok := m.list.SelectedItem().(moduleItem); ok {
+				m.chosen = i.title
 			}
-			continue
+			return m, tea.Quit
 		}
-		wordCount := 1
-		for _, char := range word {
-			if char == ' ' {
-				wordCount++
-			}
-		}
-		wordLen := 0
-		for i := 0; i < len(word); i++ {
-			for lineIndex, line := range textFile {
-				if lineIndex == (int(word[i])-32)*9+2 {
-					wordLen += len(line)
-					break
-				}
-			}
-		}
-		var spacesForJustify int
-		if wordCount == 1 && position == "justify" {
-			position = "center"
-		} else if wordCount == 1 {
-			spacesForJustify = (w - wordLen) / wordCount
-		} else {
-			spacesForJustify = (w - wordLen) / (wordCount - 1)
-		}
-		spaces := w/2 - wordLen/2
-		for h := 1; h < 9; h++ {
-			switch position {
-			case "center":
-				for i := 1; i <= spaces; i++ {
-					fmt.Print(" ")
-				}
-			case "right":
-				for i := 1; i <= spaces*2; i++ {
-					fmt.Print(" ")
-				}
-			}
-			for i := 0; i < len(word); i++ {
-				for lineIndex, line := range textFile {
-					if lineIndex == (int(word[i])-32)*9+h {
-						if position == "justify" && i != len(word)-1 && word[i] == ' ' {
-							fmt.Print(line)
-							for i := 1; i <= spacesForJustify; i++ {
-								fmt.Print(" ")
-							}
-						} else {
-							fmt.Print(line)
-						}
-						break
-					}
-				}
-			}
-			switch position {
-			case "center":
-				for i := 1; i <= spaces; i++ {
-					fmt.Print(" ")
-				}
-			case "left":
-				for i := 1; i <= spaces*2; i++ {
-					fmt.Print(" ")
-				}
-			}
-
-			fmt.Println()
-		}
+	case tea.WindowSizeMsg:
+		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v)
 	}
+
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
-func MobileModule() {
-	for index, module := range TrickMobile {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(TrickMobile) {
-		fmt.Println("Choice out of range")
-		return
-	}
-
-	switch moduleIntNo {
-	case 1:
-		mobile.InteractInject()
-	case 2:
-		mobile.InteractApkMeat()
-	case 3:
-		mobile.InteractMonitor()
-	}
-
-}
-
-func PhishModule() {
-	for index, module := range TrickPhishTemp {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select a template: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(TrickPhishTemp) {
-		fmt.Println("Choice out of range")
-		return
-	}
-
-	phish.Interact(moduleIntNo)
-}
-
-func VulnModule() {
-	vuln.Interact()
-}
-
-func WifiModule() {
-	for index, module := range TrickWifi {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(TrickWifi) {
-		fmt.Println("Choice out of range")
-		return
-	}
-
-	// Set selected module
-	SelectedModule = TrickWifi[moduleIntNo-1]
-	wifi.Interact(SelectedModule)
-}
-
-func DisplayModules() string {
-	for index, module := range Modules {
-		fmt.Printf("[%d] %s\n", index+1, module)
-	}
-
-	// Take input
-	var moduleIntNo int
-	fmt.Print("Select the number: ")
-	fmt.Scan(&moduleIntNo)
-
-	// Validate input
-	if moduleIntNo < 1 || moduleIntNo > len(Modules) {
-		fmt.Println("Choice out of range")
+func (m mainModel) View() string {
+	if m.quit {
 		return ""
 	}
-
-	// Set selected module
-	SelectedModule = Modules[moduleIntNo-1]
-	return SelectedModule
+	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 }
+
 func main() {
-	argStr := "Go-Knife"
-	sepArgs := strings.Split(argStr, "\\n")
+	// Display title
+	fmt.Println()
+	fmt.Println(tui.RenderTitle("KNIFE - Penetration Testing Toolkit"))
+	fmt.Println(tui.RenderSubtitle("Select a module to begin"))
+	fmt.Println()
 
-	width, _, _ = getTerminalSize()
-
-	file, err := os.ReadFile("letters.txt")
-	if err != nil {
-		fmt.Println(err)
+	// Create module items
+	items := []list.Item{
+		moduleItem{
+			title:       ModuleMobile,
+			description: "APK injection, reconnaissance, and monitoring",
+		},
+		moduleItem{
+			title:       ModulePhish,
+			description: "Multi-template phishing server (Facebook, Gmail, Instagram, Netflix, Outlook)",
+		},
+		moduleItem{
+			title:       ModuleVuln,
+			description: "Automated web vulnerability scanner (XSS, SQLi, LFI, RCE)",
+		},
+		moduleItem{
+			title:       ModuleWifi,
+			description: "WiFi security testing tools (Deauth, Evil Twin, Handshake, etc.)",
+		},
 	}
 
-	lines := strings.Split(string(file), "\n")
-	printAsciiArtAlign(sepArgs, lines, "left", width)
+	// Create list
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = tui.SelectedItemStyle
+	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
 
-	SelectedModule = DisplayModules()
-	fmt.Println(SelectedModule)
+	l := list.New(items, delegate, 0, 0)
+	l.Title = "📋 Available Modules"
+	l.Styles.Title = tui.TitleStyle
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
 
-	switch SelectedModule {
+	m := mainModel{list: l}
 
-	case "Mobile attack":
-		MobileModule()
-
-	case "Phishing":
-		PhishModule()
-
-	case "Web vulnerability":
-		VulnModule()
-
-	case "Wifi attack":
-		WifiModule()
-
-	default:
+	// Run bubble tea program
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Handle selection
+	if m, ok := finalModel.(mainModel); ok && m.chosen != "" {
+		switch m.chosen {
+		case ModuleMobile:
+			mobile.RunMobileModule()
+		case ModulePhish:
+			phish.RunPhishModule()
+		case ModuleVuln:
+			vuln.Interact()
+		case ModuleWifi:
+			wifi.RunWifiModule()
+		}
+	}
 }
