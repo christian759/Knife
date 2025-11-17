@@ -22,3 +22,7 @@ func InteractApkMeat() {
 	fmt.Scan(&apkPath)
 	ParseAPKMeat(apkPath)
 }
+
+func InteractMonitor() {
+	Monitor()
+}

@@ -25,6 +25,7 @@ var Modules = []string{
 var TrickMobile = []string{
 	"Injector",
 	"Recon",
+	"Monitor",
 }
 
 var TrickPhishTemp = []string{
@@ -169,6 +170,8 @@ func MobileModule() {
 		mobile.InteractInject()
 	case 2:
 		mobile.InteractApkMeat()
+	case 3:
+		mobile.InteractMonitor()
 	}
 
 }
