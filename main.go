@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
+
+	// "os/exec" // No longer needed
+	// "strconv" // No longer needed
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -35,13 +36,43 @@ func (i moduleItem) Description() string { return i.description }
 func (i moduleItem) FilterValue() string { return i.title }
 
 type mainModel struct {
-	list   list.Model
-	chosen string
-	quit   bool
+	list      list.Model
+	chosen    string
+	quit      bool
+	fontLines []string // Store the loaded font data
+	header    string   // Store the rendered header string
+	width     int      // Store terminal width
 }
 
 func (m mainModel) Init() tea.Cmd {
 	return nil
+}
+
+// updateHeader regenerates the header string
+// This is called on init and on window resize.
+func (m *mainModel) updateHeader() {
+	// 1. Generate ASCII Art
+	argStr := "Go-Knife"
+	sepArgs := strings.Split(argStr, "\\n")
+
+	// Use the model's width and fontLines
+	// We pass m.width-4 to account for the margin
+	art := generateAsciiArt(sepArgs, m.fontLines, "left", m.width-4)
+
+	// 2. Render Titles (assuming these return strings)
+	title := tui.RenderTitle("KNIFE - Penetration Testing Toolkit")
+	subtitle := tui.RenderSubtitle("Select a module to begin")
+
+	// 3. Combine them using a strings.Builder
+	var sb strings.Builder
+	sb.WriteString(art)
+	sb.WriteString("\n") // Add a newline after art
+	sb.WriteString(title)
+	sb.WriteString("\n") // Add newline after title
+	sb.WriteString(subtitle)
+	// sb.WriteString("\n") // No need for last newline, JoinVertical will handle it
+
+	m.header = sb.String()
 }
 
 func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -58,8 +89,22 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
-		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+		m.width = msg.Width // Store the new width
+		m.updateHeader()    // Regenerate the header
+
+		// Calculate layout
+		marginStyle := lipgloss.NewStyle().Margin(1, 2)
+		h, v := marginStyle.GetFrameSize()
+
+		// Calculate header height
+		headerHeight := strings.Count(m.header, "\n")
+		if m.header != "" {
+			headerHeight++ // account for the content lines
+		}
+
+		// Set list size
+		listHeight := msg.Height - v - headerHeight
+		m.list.SetSize(msg.Width-h, listHeight)
 	}
 
 	var cmd tea.Cmd
@@ -71,37 +116,21 @@ func (m mainModel) View() string {
 	if m.quit {
 		return ""
 	}
-	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+	// Combine header and list vertically
+	content := lipgloss.JoinVertical(lipgloss.Top, m.header, m.list.View())
+	// Render with margin
+	return lipgloss.NewStyle().Margin(1, 2).Render(content)
 }
 
-// getting terminal size
-func getTerminalSize() (int, int, error) {
-	cmd := exec.Command("stty", "size")
-	cmd.Stdin = os.Stdin
-	out, err := cmd.Output()
-	if err != nil {
-		return 0, 0, err
-	}
+// This is your refactored function.
+// It no longer prints, it returns a string.
+func generateAsciiArt(sentences []string, textFile []string, position string, w int) string {
+	var sb strings.Builder // Use a string builder for efficiency
 
-	size := strings.Split(string(out), " ")
-	width, err := strconv.Atoi(strings.TrimSpace(size[1]))
-	if err != nil {
-		return 0, 0, err
-	}
-
-	height, err := strconv.Atoi(strings.TrimSpace(size[0]))
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return width, height, nil
-}
-
-func printAsciiArtAlign(sentences []string, textFile []string, position string, w int) {
 	for i, word := range sentences {
 		if word == "" {
 			if i != 0 {
-				fmt.Println()
+				sb.WriteRune('\n') // Was fmt.Println()
 			}
 			continue
 		}
@@ -114,42 +143,53 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 		wordLen := 0
 		for i := 0; i < len(word); i++ {
 			for lineIndex, line := range textFile {
-				if lineIndex == (int(word[i])-32)*9+2 {
+				// Added a check to prevent index out of range
+				if i < len(word) && lineIndex == (int(word[i])-32)*9+2 {
 					wordLen += len(line)
 					break
 				}
 			}
 		}
 		var spacesForJustify int
+		originalPosition := position // Store original position
 		if wordCount == 1 && position == "justify" {
 			position = "center"
 		} else if wordCount == 1 {
-			spacesForJustify = (w - wordLen) / wordCount
+			if w > wordLen {
+				spacesForJustify = (w - wordLen) / wordCount
+			}
 		} else {
-			spacesForJustify = (w - wordLen) / (wordCount - 1)
+			if w > wordLen && wordCount > 1 {
+				spacesForJustify = (w - wordLen) / (wordCount - 1)
+			}
 		}
-		spaces := w/2 - wordLen/2
+
+		spaces := 0
+		if w > wordLen {
+			spaces = w/2 - wordLen/2
+		}
+
 		for h := 1; h < 9; h++ {
 			switch position {
 			case "center":
 				for i := 1; i <= spaces; i++ {
-					fmt.Print(" ")
+					sb.WriteString(" ") // Was fmt.Print(" ")
 				}
 			case "right":
 				for i := 1; i <= spaces*2; i++ {
-					fmt.Print(" ")
+					sb.WriteString(" ") // Was fmt.Print(" ")
 				}
 			}
 			for i := 0; i < len(word); i++ {
 				for lineIndex, line := range textFile {
-					if lineIndex == (int(word[i])-32)*9+h {
+					if i < len(word) && lineIndex == (int(word[i])-32)*9+h { // Added check
 						if position == "justify" && i != len(word)-1 && word[i] == ' ' {
-							fmt.Print(line)
+							sb.WriteString(line) // Was fmt.Print(line)
 							for i := 1; i <= spacesForJustify; i++ {
-								fmt.Print(" ")
+								sb.WriteString(" ") // Was fmt.Print(" ")
 							}
 						} else {
-							fmt.Print(line)
+							sb.WriteString(line) // Was fmt.Print(line)
 						}
 						break
 					}
@@ -158,38 +198,36 @@ func printAsciiArtAlign(sentences []string, textFile []string, position string, 
 			switch position {
 			case "center":
 				for i := 1; i <= spaces; i++ {
-					fmt.Print(" ")
+					sb.WriteString(" ") // Was fmt.Print(" ")
 				}
 			case "left":
 				for i := 1; i <= spaces*2; i++ {
-					fmt.Print(" ")
+					sb.WriteString(" ") // Was fmt.Print(" ")
 				}
 			}
-
-			fmt.Println()
+			// Only add newline if it's not the last line of the last sentence
+			if h < 8 || i < len(sentences)-1 {
+				sb.WriteRune('\n') // Was fmt.Println()
+			}
 		}
+		position = originalPosition // Reset position for next loop
 	}
+	return sb.String() // Return the final, built string
 }
 
 func main() {
-	argStr := "Go-Knife"
-	sepArgs := strings.Split(argStr, "\\n")
+	// getTerminalSize() is no longer needed. Bubble Tea provides this.
 
-	width, _, _ := getTerminalSize()
-
+	// Load the font file
 	file, err := os.ReadFile("letters.txt")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error reading letters.txt:", err)
+		os.Exit(1)
 	}
-
 	lines := strings.Split(string(file), "\n")
-	printAsciiArtAlign(sepArgs, lines, "left", width)
 
-	// Display title
-	fmt.Println()
-	fmt.Println(tui.RenderTitle("KNIFE - Penetration Testing Toolkit"))
-	fmt.Println(tui.RenderSubtitle("Select a module to begin"))
-	fmt.Println()
+	// All printing logic is removed from main
+	// fmt.Println(...)
 
 	// Create module items
 	items := []list.Item{
@@ -222,7 +260,11 @@ func main() {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 
-	m := mainModel{list: l}
+	// Create the model and pass in the font data
+	m := mainModel{
+		list:      l,
+		fontLines: lines,
+	}
 
 	// Run bubble tea program
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -232,7 +274,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Handle selection
+	// Handle selection (this part was already correct)
 	if m, ok := finalModel.(mainModel); ok && m.chosen != "" {
 		switch m.chosen {
 		case ModuleMobile:
