@@ -40,6 +40,9 @@ go mod download
 
 Key dependencies:
 - `github.com/google/gopacket` - Packet capture and processing
+- `github.com/charmbracelet/bubbletea` - Modern TUI framework
+- `github.com/charmbracelet/bubbles` - TUI components (list, textinput, filepicker)
+- `github.com/charmbracelet/lipgloss` - Style definitions and rendering
 - System requirement: `libpcap-dev` (for packet manipulation features)
 
 ### CI/CD
@@ -51,26 +54,29 @@ GitHub Actions workflow (`.github/workflows/go.yml`) automatically:
 ## Architecture
 
 ### Module System
-The application follows a clean modular architecture:
+The application follows a clean modular architecture with modern TUI:
 
 ```
-main.go                          # Entry point with ASCII art UI and module router
+main.go                          # Entry point with Bubble Tea TUI and module router
+├── tui/
+│   └── styles.go               # Centralized lipgloss styles and rendering utilities
 ├── modules/
 │   ├── mobile/                  # Android APK manipulation
-│   │   ├── cli.go              # Interactive prompts
+│   │   ├── tui.go              # Bubble Tea TUI with file picker
 │   │   ├── injector.go         # APK payload injection (passive - doesn't auto-execute)
 │   │   ├── recon.go            # APK reconnaissance
 │   │   └── monitor_process.go # Device monitoring
 │   ├── phish/                  # Phishing infrastructure
-│   │   ├── cli.go              # Template launcher
+│   │   ├── tui.go              # Bubble Tea template selection
 │   │   ├── phishing.go         # HTTP server + credential logging with geo-location
 │   │   └── templates/          # HTML/CSS templates per service
 │   ├── vuln/                   # Web vulnerability scanner
-│   │   ├── cli.go              # Interactive configuration
+│   │   ├── tui.go              # Bubble Tea multi-form interface
 │   │   ├── vuln.go             # Scanner engine (XSS, SQLi, LFI, RCE, etc.)
 │   │   └── report.go           # HTML report generation
 │   └── wifi/                   # WiFi attack suite
-│       ├── cli.go              # Main interactive handlers
+│       ├── tui.go              # Comprehensive Bubble Tea TUI with AP selection
+│       ├── cli.go              # Legacy CLI handlers (still used by TUI)
 │       ├── general.go          # Interface detection + AP scanning
 │       ├── deauth.go           # Deauth attack (simulator)
 │       ├── evil_twin.go        # Rogue AP
@@ -89,34 +95,42 @@ main.go                          # Entry point with ASCII art UI and module rout
 ### Key Architectural Patterns
 
 **1. Module Isolation**
-Each module (mobile, phish, vuln, wifi) is self-contained with its own `cli.go` for user interaction and implementation files for core logic.
+Each module (mobile, phish, vuln, wifi) is self-contained with its own `tui.go` for user interaction and implementation files for core logic.
 
-**2. Interactive CLI Flow**
-- `main.go` displays ASCII art and top-level module menu
-- Each module's `Interact*()` function handles sub-menu navigation
-- User input is gathered via `fmt.Scan()` or `bufio.Reader`
-- WiFi module auto-detects interfaces using `iw dev` command
+**2. Modern TUI Architecture (Bubble Tea)**
+- `main.go` displays styled title and top-level module menu using Bubble Tea
+- Each module has dedicated TUI models implementing the `tea.Model` interface
+- User interaction through keyboard navigation (arrows, enter, tab, etc.)
+- Centralized styling via `tui/styles.go` with adaptive light/dark themes
+- Responsive layouts that adapt to terminal size
 
-**3. WiFi Module Auto-Detection**
+**3. TUI Component Patterns**
+- **List models**: For menu selection (modules, actions, APs)
+- **Form models**: Multi-field input with tab navigation and validation
+- **File picker**: Interactive file browser for APK/payload selection
+- **Text input**: Single-field input with placeholders and styling
+- All TUI components use consistent styling from `tui/styles.go`
+
+**4. WiFi Module Auto-Detection**
 The WiFi module automatically:
 - Detects wireless interfaces via `GetWirelessInterfaces()` 
 - Scans for nearby APs using `iw dev <iface> scan`
 - Selects strongest AP for deauth attacks
 - Parses BSSID, SSID, and signal strength from `iw` output
 
-**4. Phishing Module Design**
+**5. Phishing Module Design**
 - HTTP server on port 8080
 - Logs credentials to `phishing_creds.txt`
 - Enriches logs with IP geolocation via ip-api.com
 - Templates stored in `modules/phish/templates/<service>/index.html`
 
-**5. Vulnerability Scanner Pattern**
+**6. Vulnerability Scanner Pattern**
 - Array of `VulnCheck` structs defines tests (payload + regex matcher)
 - Supports both GET and POST methods
 - Generates timestamped HTML reports in user's home directory
 - No redirect following for open redirect detection
 
-**6. Mobile Module Limitations**
+**7. Mobile Module Limitations**
 **IMPORTANT**: The APK injector (`injector.go`) passively injects `.dex` files into APK archives but:
 - Does NOT auto-execute on device
 - Does NOT establish reverse shells
@@ -156,16 +170,22 @@ Vulnerability scanner uses case-insensitive regex matching with `(?i)` prefix fo
 
 ## Development Notes
 
+### Adding New Modules
+1. Create new directory under `modules/`
+2. Implement `tui.go` with Bubble Tea models
+3. Add module to `main.go` module list
+4. Use shared styles from `tui/styles.go`
+
 ### Adding New Phishing Templates
 1. Create directory: `modules/phish/templates/<ServiceName>/`
 2. Add `index.html` with form posting to `/log`
 3. Form fields must be named `email` and `pass`
-4. Add service name to `TrickPhishTemp` array in `main.go`
+4. Add new `templateItem` to `RunPhishModule()` in `modules/phish/tui.go`
 
 ### Adding WiFi Attack Types
 1. Implement handler function in appropriate `modules/wifi/*.go` file
-2. Add handler case to `Interact()` in `modules/wifi/cli.go`
-3. Add attack name to `TrickWifi` array in `main.go`
+2. Add `wifiActionItem` to `RunWifiModule()` in `modules/wifi/tui.go`
+3. Add case to `handleWifiAction()` with corresponding `run*()` function
 
 ### Adding Vulnerability Checks
 Add entry to `vulns` slice in `modules/vuln/vuln.go` with:

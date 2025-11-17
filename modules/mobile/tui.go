@@ -147,31 +147,35 @@ func (m injectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+	}
 
-	case filepicker.SelectedMsg:
-		// File selected from picker
-		path := string(msg)
-		switch m.state {
-		case statePickAPK:
-			m.apkPath = path
-			m.state = statePickPayload
-			m.filepicker.CurrentDirectory = "."
-		case statePickPayload:
-			m.payloadPath = path
-			m.state = statePickOutput
-			m.useTextInput = true
-			m.textinput.Focus()
-			m.textinput.Placeholder = "Enter output path inside APK (e.g., assets/payload.dex)..."
-		case statePickOutput:
-			m.outputPath = path
-			m.state = stateDone
-			return m, tea.Quit
+	// Check if file was selected via filepicker
+	if !m.useTextInput {
+		if selected, path := m.filepicker.DidSelectFile(msg); selected {
+			switch m.state {
+			case statePickAPK:
+				m.apkPath = path
+				m.state = statePickPayload
+				m.filepicker.CurrentDirectory = "."
+				return m, m.filepicker.Init()
+			case statePickPayload:
+				m.payloadPath = path
+				m.state = statePickOutput
+				m.useTextInput = true
+				m.textinput.Focus()
+				m.textinput.Placeholder = "Enter output path inside APK (e.g., assets/payload.dex)..."
+				return m, nil
+			case statePickOutput:
+				m.outputPath = path
+				m.state = stateDone
+				return m, tea.Quit
+			}
 		}
-		return m, m.filepicker.Init()
 
-	case filepicker.ErrorMsg:
-		m.err = msg
-		return m, nil
+		if disabled, path := m.filepicker.DidSelectDisabledFile(msg); disabled {
+			m.err = fmt.Errorf("file not allowed: %s", path)
+			return m, nil
+		}
 	}
 
 	var cmd tea.Cmd
