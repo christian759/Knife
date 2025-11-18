@@ -336,11 +336,11 @@ func Interact() {
 
 	// Output path
 	homeDir, _ := os.UserHomeDir()
-	reportFile := fmt.Sprintf("%s/%s_report_%d.html", homeDir, 
-		strings.ReplaceAll(strings.ReplaceAll(target, "http://", ""), "https://", ""), 
+	reportFile := fmt.Sprintf("%s/%s_report_%d.html", homeDir,
+		strings.ReplaceAll(strings.ReplaceAll(target, "http://", ""), "https://", ""),
 		time.Now().Unix())
 
-	err = ScanURL(target, headers, cookies, reportFile)
+	err = RunXSSScan(target, headers, cookies, reportFile)
 	if err != nil {
 		fmt.Println(tui.RenderError(fmt.Sprintf("Scan failed: %v", err)))
 		return

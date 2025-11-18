@@ -652,7 +652,7 @@ func (s *Scanner) run() {
 }
 
 // generate HTML report
-func generateHTMLReport(out string, target string, findings []FindingC) error {
+func generateHTMLReport(out string, target string, findings []Finding) error {
 	const tpl = `<!doctype html>
 <html>
 <head>
@@ -719,51 +719,41 @@ code{background:#f4f4f4;padding:2px 6px;border-radius:4px}
 	return t.Execute(f, data)
 }
 
-/*
+// RunXSSScan is a wrapper to integrate with the TUI
+func RunXSSScan(target string, headers map[string]string, cookies string, reportPath string) error {
+	// intensity: basic | full | both
+	intensity := "both"
 
-func main() {
-	start := flag.String("start", "", "Start URL (required) e.g., https://example.com")
-	intensity := flag.String("intensity", "basic", "Scan intensity: basic|full|both")
-	out := flag.String("out", "report.html", "HTML report output file")
-	concurrency := flag.Int("concurrency", 6, "Concurrent workers")
-	maxpages := flag.Int("max-pages", 500, "Maximum pages to scan")
-	depth := flag.Int("depth", 2, "Crawl depth")
-	useChrome := flag.Bool("use-chrome", false, "Use Chrome (chromedp) for DOM checks (optional)")
-	throttleMS := flag.Int("throttle-ms", 0, "Milliseconds to wait between requests (throttle)")
-	flag.Parse()
+	// chrome dom check disabled by default (TUI shouldn't force chrome)
+	useChrome := false
 
-	if *start == "" {
-		fmt.Println("Please provide --start")
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	if *intensity != "basic" && *intensity != "full" && *intensity != "both" {
-		fmt.Println("invalid --intensity; use basic|full|both")
-		os.Exit(1)
-	}
-
-	throttle := time.Duration(*throttleMS) * time.Millisecond
-	s, err := newScanner(*start, *concurrency, *maxpages, *depth, *intensity, *useChrome, throttle)
+	scanner, err := newScanner(target,
+		10,                   // workers
+		200,                  // max pages
+		6,                    // max depth
+		intensity,            // intensity
+		useChrome,            // dom check
+		300*time.Millisecond, // throttle
+	)
 	if err != nil {
-		log.Fatalf("init scanner: %v", err)
+		return err
 	}
-	startTime := time.Now()
-	log.Printf("Starting scan %s intensity=%s workers=%d\n", *start, *intensity, *concurrency)
-	s.run()
-	elapsed := time.Since(startTime)
-	log.Printf("Scan complete in %s — pages scanned: %d — findings: %d\n", elapsed.String(), len(s.Visited), len(s.Findings))
 
-	// save JSON as well for structured data (optional)
-	jsonOut := strings.TrimSuffix(*out, path.Ext(*out)) + ".json"
-	js, _ := json.MarshalIndent(map[string]interface{}{"target": *start, "findings": s.Findings}, "", "  ")
-	_ = ioutil.WriteFile(jsonOut, js, 0644)
-
-	// generate HTML
-	if err := generateHTMLReport(*out, *start, s.Findings); err != nil {
-		log.Fatalf("failed to write report: %v", err)
+	// add headers + cookies
+	extra := map[string]string{}
+	for k, v := range headers {
+		extra[k] = v
 	}
-	log.Printf("HTML report written to %s (raw JSON also at %s)\n", *out, jsonOut)
+	if cookies != "" {
+		extra["Cookie"] = cookies
+	}
+
+	// start scan
+	go func() { scanner.run() }()
+
+	// wait
+	scanner.run()
+
+	// generate HTML report
+	return generateHTMLReport(reportPath, target, scanner.Findings)
 }
-
-*/
