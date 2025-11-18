@@ -21,8 +21,8 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// Finding describes a discovered potential XSS
-type Finding struct {
+// FindingXSS describes a discovered potential XSS
+type FindingXSS struct {
 	Type            string            `json:"type"`
 	URL             string            `json:"url"`
 	Context         string            `json:"context,omitempty"`
@@ -48,7 +48,7 @@ type Scanner struct {
 	Visited       map[string]bool
 	VisitedMu     sync.RWMutex
 	Queue         chan crawlJob
-	Findings      []Finding
+	Findings      []FindingXSS
 	FindingsMu    sync.Mutex
 	Posted        []PostedPayload
 	PostedMu      sync.Mutex
@@ -121,7 +121,7 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity string,
 		Client:    client,
 		Visited:   make(map[string]bool),
 		Queue:     make(chan crawlJob, 1000),
-		Findings:  []Finding{},
+		Findings:  []FindingXSS{},
 		Posted:    []PostedPayload{},
 		Workers:   workers,
 		MaxPages:  maxPages,
@@ -143,7 +143,7 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity string,
 }
 
 // add finding
-func (s *Scanner) addFinding(f Finding) {
+func (s *Scanner) addFinding(f FindingXSS) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
 	f.Timestamp = time.Now().UTC().Format(time.RFC3339)
@@ -313,7 +313,7 @@ func (s *Scanner) fuzzParams(rawurl string) {
 				continue
 			}
 			if strings.Contains(body, payload) {
-				s.addFinding(Finding{
+				s.addFinding(FindingXSS{
 					Type:            "reflected",
 					URL:             test,
 					Context:         fmt.Sprintf("param-%s", name),
@@ -323,7 +323,7 @@ func (s *Scanner) fuzzParams(rawurl string) {
 			}
 			// encoded variant check
 			if strings.Contains(body, htmlEscape(payload)) {
-				s.addFinding(Finding{
+				s.addFinding(FindingXSS{
 					Type:            "reflected-encoded",
 					URL:             test,
 					Context:         fmt.Sprintf("param-%s", name),
@@ -415,7 +415,7 @@ func (s *Scanner) fuzzForms(pageURL, body string) {
 					_, respBody, _, err := s.postForm(action, form, map[string]string{"Referer": s.StartURL.String()})
 					if err == nil {
 						if strings.Contains(respBody, payload) {
-							s.addFinding(Finding{
+							s.addFinding(FindingXSS{
 								Type:            "reflected-form",
 								URL:             action,
 								Context:         fmt.Sprintf("form-%s", name),
@@ -436,7 +436,7 @@ func (s *Scanner) fuzzForms(pageURL, body string) {
 						u.RawQuery = q.Encode()
 						_, respBody, _, err := s.fetch(u.String(), map[string]string{"Referer": s.StartURL.String()})
 						if err == nil && strings.Contains(respBody, payload) {
-							s.addFinding(Finding{
+							s.addFinding(FindingXSS{
 								Type:            "reflected-form",
 								URL:             u.String(),
 								Context:         fmt.Sprintf("form-%s", name),
@@ -464,7 +464,7 @@ func (s *Scanner) analyzeForStoredMarkers(pageURL, body string) {
 			continue
 		}
 		if strings.Contains(body, p.Marker) {
-			s.addFinding(Finding{
+			s.addFinding(FindingXSS{
 				Type:            "stored-reflection",
 				URL:             pageURL,
 				Payload:         p.Marker,
@@ -500,7 +500,7 @@ func (s *Scanner) domCheck(u string) {
 	}
 	for _, p := range payloads {
 		if strings.Contains(html, p) {
-			s.addFinding(Finding{
+			s.addFinding(FindingXSS{
 				Type:            "dom-reflection",
 				URL:             u,
 				Context:         "chromedp",
@@ -512,7 +512,7 @@ func (s *Scanner) domCheck(u string) {
 	re := regexp.MustCompile(`(document\.write|innerHTML|outerHTML|eval\(|setTimeout\(|setInterval\()`)
 	m := re.FindString(html)
 	if m != "" {
-		s.addFinding(Finding{
+		s.addFinding(FindingXSS{
 			Type:    "dom-suspicious-code",
 			URL:     u,
 			Context: m,
@@ -548,7 +548,7 @@ func (s *Scanner) worker(wg *sync.WaitGroup) {
 		// quick raw payload detection (non-marked)
 		for _, p := range append(s.PayloadsBasic, s.PayloadsFull...) {
 			if strings.Contains(body, p) {
-				s.addFinding(Finding{
+				s.addFinding(FindingXSS{
 					Type:            "reflected-raw",
 					URL:             job.URL,
 					Context:         "raw",
@@ -652,7 +652,7 @@ func (s *Scanner) run() {
 }
 
 // generate HTML report
-func generateHTMLReport(out string, target string, findings []Finding) error {
+func generateHTMLReport(out string, target string, findings []FindingXSS) error {
 	const tpl = `<!doctype html>
 <html>
 <head>
