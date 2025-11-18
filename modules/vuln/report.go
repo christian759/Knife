@@ -257,7 +257,7 @@ func WriteReport(filename string) error {
 
 	data := struct {
 		GeneratedAt string
-		Findings    []Finding
+		Findings    []FindingC
 	}{
 		GeneratedAt: now,
 		Findings:    findings,

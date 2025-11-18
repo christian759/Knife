@@ -32,7 +32,7 @@ var vulns = []VulnCheck{
 	{"XXE", "xml", `<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`, `root:x:0:0`, "POST"},
 }
 
-type Finding struct {
+type FindingC struct {
 	Name          string
 	Param         string
 	Method        string
@@ -47,13 +47,13 @@ type Finding struct {
 	Timestamp     time.Time
 }
 
-var findings []Finding
+var findings []FindingC
 
 // ScanURL runs the checks and automatically writes an HTML report at the end.
 // pass reportFilename as desired (e.g. "report.html"); if empty, a timestamped filename will be generated.
 func ScanURL(target string, extraHeaders map[string]string, cookies string, reportFilename string) error {
 	// reset findings for each run
-	findings = []Finding{}
+	findings = []FindingC{}
 
 	// clients
 	defaultClient := &http.Client{Timeout: 15 * time.Second}
@@ -151,7 +151,7 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string, repo
 					strings.Contains(lowerLoc, "evil.com") {
 					fmt.Printf("[!] Potential %-30s | Param: %-10s | Method: %-4s | Status: %d | URL: %s | Location: %s\n",
 						check.Name, check.Param, check.Method, resp.StatusCode, testURL, loc)
-					f := Finding{
+					f := FindingC{
 						Name:          check.Name,
 						Param:         check.Param,
 						Method:        check.Method,
@@ -200,7 +200,7 @@ func ScanURL(target string, extraHeaders map[string]string, cookies string, repo
 			fmt.Printf("[!] Potential %-30s | Param: %-10s | Method: %-4s | Status: %d | URL: %s\n",
 				check.Name, check.Param, check.Method, resp.StatusCode, testURL)
 
-			f := Finding{
+			f := FindingC{
 				Name:          check.Name,
 				Param:         check.Param,
 				Method:        check.Method,
