@@ -671,6 +671,7 @@ func runSniffer() {
 		iface := m.fields[0].value
 		probeOnly := strings.ToLower(m.fields[1].value) == "y"
 		timeout, _ := strconv.Atoi(m.fields[2].value)
+		IsRootOrSudoRelaunch()
 
 		fmt.Println()
 		if probeOnly {
@@ -689,6 +690,7 @@ func runScanner() {
 		fmt.Println(tui.RenderError("No wireless interfaces detected"))
 		return
 	}
+	IsRootOrSudoRelaunch()
 
 	fmt.Println()
 	fmt.Println(tui.RenderInfo("Scanning for nearby networks..."))

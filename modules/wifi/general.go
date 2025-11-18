@@ -4,11 +4,60 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+const privilegedFlag = "--run-pmkid-privileged"
+
+func IsRootOrSudoRelaunch() bool {
+	// 1. If we are already running as root, return true.
+	if os.Getuid() == 0 {
+		return true
+	}
+
+	// 2. Check if the magic flag is already present.
+	// If it is, this means we've already tried to relaunch and failed, or the user manually used sudo.
+	// We treat it as a non-privileged process that should exit cleanly.
+	for _, arg := range os.Args {
+		if arg == privilegedFlag {
+			// If the flag is present but we are NOT root (os.Getuid() != 0),
+			// it means the sudo attempt failed or was canceled.
+			return false // Stop execution of the task.
+		}
+	}
+
+	// 3. If not root and no magic flag, attempt to relaunch with sudo.
+	fmt.Println("This operation requires root privileges. Requesting sudo...")
+
+	executable, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to find executable path: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Append the magic flag to the arguments being passed to sudo.
+	args := append(os.Args[1:], privilegedFlag)
+	cmd := exec.Command("sudo", append([]string{executable}, args...)...)
+
+	// Connect streams for password prompt
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to re-run with sudo: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 4. Exit the non-privileged process (MANDATORY STEP).
+	os.Exit(0)
+	return false // Unreachable, but satisfies compiler
+}
 
 // GetWirelessInterfaces returns a slice of wireless interface names (wlan0, wlp2s0, etc).
 func GetWirelessInterfaces() ([]string, error) {
