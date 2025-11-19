@@ -190,6 +190,21 @@ func extractSecurityHeaders(resp *http.Response) map[string]string {
 	return m
 }
 
+func sameSiteToString(s http.SameSite) string {
+	switch s {
+	case http.SameSiteDefaultMode:
+		return "Default"
+	case http.SameSiteLaxMode:
+		return "Lax"
+	case http.SameSiteStrictMode:
+		return "Strict"
+	case http.SameSiteNoneMode:
+		return "None"
+	default:
+		return "Unknown"
+	}
+}
+
 func extractCookies(resp *http.Response) []CookieInfo {
 	cookies := []CookieInfo{}
 	for _, c := range resp.Cookies() {
@@ -197,7 +212,7 @@ func extractCookies(resp *http.Response) []CookieInfo {
 			Name:     c.Name,
 			Secure:   c.Secure,
 			HTTPOnly: c.HttpOnly,
-			SameSite: c.SameSite.String(),
+			SameSite: sameSiteToString(c.SameSite),
 		}
 		cookies = append(cookies, ci)
 	}
