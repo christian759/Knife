@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -36,6 +37,7 @@ type RedirectScanner struct {
 	Findings    []FindingRedirect
 	FindingsMu  sync.Mutex
 	Workers     int
+	Active      int32
 	MaxPages    int
 	PageCount   int
 	PageCountMu sync.Mutex
@@ -102,17 +104,17 @@ func (s *RedirectScanner) Run() {
 	s.enqueue(s.StartURL.String(), 0)
 
 	for {
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
 		
-		if done && len(s.Queue) == 0 {
-			break
-		}
-		if len(s.Queue) == 0 {
-			time.Sleep(2 * time.Second)
-			if len(s.Queue) == 0 {
+		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
+			if done {
+				break
+			}
+			time.Sleep(1 * time.Second)
+			if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 				break
 			}
 		}
@@ -124,14 +126,17 @@ func (s *RedirectScanner) Run() {
 func (s *RedirectScanner) worker(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range s.Queue {
+		atomic.AddInt32(&s.Active, 1)
 		s.PageCountMu.Lock()
 		if s.PageCount >= s.MaxPages {
 			s.PageCountMu.Unlock()
+			atomic.AddInt32(&s.Active, -1)
 			return
 		}
 		s.PageCountMu.Unlock()
 
 		if !s.markVisited(job.URL) {
+			atomic.AddInt32(&s.Active, -1)
 			continue
 		}
 
@@ -142,6 +147,7 @@ func (s *RedirectScanner) worker(wg *sync.WaitGroup) {
 		if job.Depth < s.MaxDepth {
 			s.crawl(job.URL, job.Depth)
 		}
+		atomic.AddInt32(&s.Active, -1)
 	}
 }
 

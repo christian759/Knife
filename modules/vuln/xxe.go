@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -39,6 +40,7 @@ type XXEScanner struct {
 	Findings    []FindingXXE
 	FindingsMu  sync.Mutex
 	Workers     int
+	Active      int32 // Added Active field
 	MaxPages    int
 	PageCount   int
 	PageCountMu sync.Mutex
@@ -105,12 +107,14 @@ func (s *XXEScanner) Run() {
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
 		
-		if done && len(s.Queue) == 0 {
-			break
-		}
-		if len(s.Queue) == 0 {
+		// Wait for queue to be empty AND no workers active
+		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
+			if done {
+				break
+			}
+			// Double check after a small delay to be sure
 			time.Sleep(2 * time.Second)
-			if len(s.Queue) == 0 {
+			if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 				break
 			}
 		}
@@ -122,14 +126,17 @@ func (s *XXEScanner) Run() {
 func (s *XXEScanner) worker(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range s.Queue {
+		atomic.AddInt32(&s.Active, 1) // Increment active workers
 		s.PageCountMu.Lock()
 		if s.PageCount >= s.MaxPages {
 			s.PageCountMu.Unlock()
+			atomic.AddInt32(&s.Active, -1) // Decrement before returning
 			return
 		}
 		s.PageCountMu.Unlock()
 
 		if !s.markVisited(job.URL) {
+			atomic.AddInt32(&s.Active, -1) // Decrement before continuing
 			continue
 		}
 
@@ -140,6 +147,7 @@ func (s *XXEScanner) worker(wg *sync.WaitGroup) {
 		if job.Depth < s.MaxDepth {
 			s.crawl(job.URL, job.Depth)
 		}
+		atomic.AddInt32(&s.Active, -1) // Decrement active workers
 	}
 }
 

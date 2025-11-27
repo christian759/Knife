@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -53,6 +54,7 @@ type Scanner struct {
 	Posted        []PostedPayload
 	PostedMu      sync.Mutex
 	Workers       int
+	Active        int32
 	MaxPages      int
 	PageCount     int
 	PageCountMu   sync.Mutex
@@ -524,15 +526,18 @@ func (s *Scanner) domCheck(u string) {
 func (s *Scanner) worker(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range s.Queue {
+		atomic.AddInt32(&s.Active, 1)
 		// page count guard
 		s.PageCountMu.Lock()
 		if s.PageCount >= s.MaxPages {
 			s.PageCountMu.Unlock()
+			atomic.AddInt32(&s.Active, -1)
 			return
 		}
 		s.PageCountMu.Unlock()
 		// ensure single visit
 		if !s.markVisited(job.URL) {
+			atomic.AddInt32(&s.Active, -1)
 			continue
 		}
 		log.Printf("[crawl] %s (depth %d)\n", job.URL, job.Depth)
@@ -540,6 +545,7 @@ func (s *Scanner) worker(wg *sync.WaitGroup) {
 		_, body, ctype, err := s.fetch(job.URL, headers)
 		if err != nil {
 			log.Printf("[error] fetch %s: %v\n", job.URL, err)
+			atomic.AddInt32(&s.Active, -1)
 			continue
 		}
 		// analyze stored markers
@@ -589,6 +595,7 @@ func (s *Scanner) worker(wg *sync.WaitGroup) {
 		if s.UseChrome && strings.Contains(strings.ToLower(ctype), "text/html") {
 			s.domCheck(job.URL)
 		}
+		atomic.AddInt32(&s.Active, -1)
 	}
 }
 
@@ -632,13 +639,13 @@ func (s *Scanner) run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		if done && len(s.Queue) == 0 {
+		if done && len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			break
 		}
-		if len(s.Queue) == 0 {
+		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			// no queued jobs — give workers a bit to finish
 			time.Sleep(800 * time.Millisecond)
-			if len(s.Queue) == 0 {
+			if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 				break
 			}
 		}
@@ -749,7 +756,7 @@ func RunXSSScan(target string, headers map[string]string, cookies string, report
 	}
 
 	// start scan
-	go func() { scanner.run() }()
+
 
 	// wait
 	scanner.run()
