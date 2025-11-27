@@ -457,7 +457,7 @@ func (s *CmdInjScanner) checkTimeBased(url, param, payload string) bool {
 	start := time.Now()
 	// make request
 	// ...
-	baseline := time.Since(start)
+	_ = time.Since(start)
 
 	// 2. Inject sleep command (e.g., sleep 5)
 	// ...

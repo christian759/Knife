@@ -1,13 +1,10 @@
 package vuln
 
 import (
-	"bufio"
-	"context"
 	"fmt"
 	"html/template"
 	"io"
 	"log"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -396,13 +393,7 @@ func (s *LFIScanner) normalize(base, href string) (string, error) {
 	return resolved.String(), nil
 }
 
-// snippet extracts a relevant part of the string
-func snippet(s string, limit int) string {
-	if len(s) <= limit {
-		return s
-	}
-	return s[:limit] + "..."
-}
+
 
 // RunLFIScan is the entry point for the CLI/TUI
 func RunLFIScan(target string, headers map[string]string, cookies string, reportPath string) error {

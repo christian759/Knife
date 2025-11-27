@@ -3,7 +3,6 @@ package vuln
 import (
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
