@@ -2,12 +2,17 @@ package phish
 
 import (
 	"fmt"
+	"knife/modules/phish/web"
 	"knife/tui"
 	"os"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	PagePhishing = "Web Page Phishing"
 )
 
 type templateItem struct {
@@ -57,24 +62,8 @@ func (m phishModel) View() string {
 func RunPhishModule() {
 	items := []list.Item{
 		templateItem{
-			title:       "Facebook",
+			title:       PagePhishing,
 			description: "Facebook login page phishing template",
-		},
-		templateItem{
-			title:       "Gmail",
-			description: "Gmail login page phishing template",
-		},
-		templateItem{
-			title:       "Instagram",
-			description: "Instagram login page phishing template",
-		},
-		templateItem{
-			title:       "Netflix",
-			description: "Netflix login page phishing template",
-		},
-		templateItem{
-			title:       "Outlook",
-			description: "Outlook login page phishing template",
 		},
 	}
 
@@ -95,5 +84,12 @@ func RunPhishModule() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
+	}
+
+	if m, ok := finalModel.(phishModel); ok && m.chosen != "" {
+		switch m.chosen {
+		case PagePhishing:
+			web.RunPagePhishModule()
+		}
 	}
 }
