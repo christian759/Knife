@@ -2,12 +2,10 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -106,7 +104,7 @@ func (s *TraversalScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -212,7 +210,7 @@ func (s *TraversalScanner) fuzzURL(rawURL string) {
 			if err != nil {
 				continue
 			}
-			
+
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 			resp.Body.Close()
 			if err != nil {
@@ -323,7 +321,7 @@ func (s *TraversalScanner) normalize(base, href string) (string, error) {
 
 func RunTraversalScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Directory Traversal Scanner on", target)
-	
+
 	scanner, err := NewTraversalScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -332,96 +330,6 @@ func RunTraversalScan(target string, headers map[string]string, cookies string, 
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential traversals.\n", len(scanner.Findings))
-	
-	return GenerateTraversalReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateTraversalReport(filename, target string, findings []FindingTraversal) error {
-	t := template.New("traversal-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>Traversal Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.evidence { background-color: #ffe6e6; font-family: monospace; }
-	</style>
-</head>
-<body>
-	<h1>Directory Traversal Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="evidence">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No Traversal vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingTraversal
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Extended Logic for 500+ lines ---
-
-func init() {
-	// Placeholder
-}
-
-/*
-	Documentation:
-	The TraversalScanner detects Directory Traversal vulnerabilities.
-	It attempts to access files outside the web root by injecting traversal sequences.
-*/
-
-// ... more padding ...
-type TraversalConfig struct {
-	Depth int
-}
-
-func (s *TraversalScanner) SetConfig(cfg TraversalConfig) {
-	// ...
+	return err
 }

