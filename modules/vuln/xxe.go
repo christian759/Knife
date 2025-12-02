@@ -2,12 +2,10 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -106,7 +104,7 @@ func (s *XXEScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		// Wait for queue to be empty AND no workers active
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
@@ -204,7 +202,7 @@ func (s *XXEScanner) fuzzURL(rawURL string) {
 		if err != nil {
 			continue
 		}
-		
+
 		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 		resp.Body.Close()
 		if err != nil {
@@ -355,7 +353,7 @@ func (s *XXEScanner) normalize(base, href string) (string, error) {
 
 func RunXXEScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting XXE Scanner on", target)
-	
+
 	scanner, err := NewXXEScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -364,103 +362,6 @@ func RunXXEScan(target string, headers map[string]string, cookies string, report
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential XXEs.\n", len(scanner.Findings))
-	
-	return GenerateXXEReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateXXEReport(filename, target string, findings []FindingXXE) error {
-	t := template.New("xxe-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>XXE Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.evidence { background-color: #ffe6e6; font-family: monospace; }
-	</style>
-</head>
-<body>
-	<h1>XXE Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="evidence">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No XXE vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingXXE
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Extended Logic for 500+ lines ---
-
-func init() {
-	// Placeholder
-}
-
-// Check for Blind XXE (OOB)
-func (s *XXEScanner) checkBlindXXE(url string) bool {
-	// ...
-	return false
-}
-
-/*
-	Documentation:
-	The XXEScanner detects XML External Entity vulnerabilities.
-	It attempts to inject XML payloads containing external entities into
-	POST bodies and URL parameters.
-*/
-
-// ... more padding ...
-type XXEConfig struct {
-	OOBServer string
-}
-
-func (s *XXEScanner) SetConfig(cfg XXEConfig) {
-	// ...
+	return err
 }

@@ -2,12 +2,10 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -106,7 +104,7 @@ func (s *SSRFScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -212,7 +210,7 @@ func (s *SSRFScanner) fuzzURL(rawURL string) {
 			if err != nil {
 				continue
 			}
-			
+
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 			resp.Body.Close()
 			if err != nil {
@@ -339,7 +337,7 @@ func (s *SSRFScanner) normalize(base, href string) (string, error) {
 
 func RunSSRFScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting SSRF Scanner on", target)
-	
+
 	scanner, err := NewSSRFScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -348,121 +346,6 @@ func RunSSRFScan(target string, headers map[string]string, cookies string, repor
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential SSRFs.\n", len(scanner.Findings))
-	
-	return GenerateSSRFReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateSSRFReport(filename, target string, findings []FindingSSRF) error {
-	t := template.New("ssrf-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>SSRF Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.evidence { background-color: #ffe6e6; font-family: monospace; }
-	</style>
-</head>
-<body>
-	<h1>SSRF Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="evidence">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No SSRF vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingSSRF
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Extended Logic for 500+ lines ---
-
-func init() {
-	// Placeholder
-}
-
-// Check for blind SSRF (Time-based)
-func (s *SSRFScanner) checkBlindSSRF(url string) bool {
-	// Logic to check if the server takes longer to respond when hitting a non-existent internal IP
-	// vs an existent one (if we can guess it).
-	// Or hitting a tarpit.
-	return false
-}
-
-// Port Scanning Logic
-func (s *SSRFScanner) scanInternalPorts(baseUrl string) {
-	ports := []int{22, 80, 443, 3306, 6379, 8080, 8443}
-	for _, port := range ports {
-		// Construct payload http://127.0.0.1:PORT
-		_ = port
-	}
-}
-
-/*
-	Documentation:
-	The SSRFScanner detects Server-Side Request Forgery vulnerabilities.
-	It attempts to trick the server into making requests to internal resources,
-	loopback addresses, or cloud metadata services.
-	
-	It supports:
-	- IPv4/IPv6 loopback addresses
-	- Cloud metadata endpoints (AWS, GCP, Azure)
-	- Protocol wrappers (file://, gopher://, etc.)
-	- Obfuscated IP addresses (decimal, octal, hex)
-*/
-
-// ... more padding ...
-type SSRFConfig struct {
-	ScanPorts bool
-	CloudOnly bool
-}
-
-func (s *SSRFScanner) SetConfig(cfg SSRFConfig) {
-	// ...
+	return err
 }
