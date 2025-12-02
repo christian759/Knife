@@ -1,4 +1,4 @@
-package phish
+package web
 
 import (
 	"encoding/json"

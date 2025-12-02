@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"knife/modules/phish/web"
 	"knife/tui"
 )
 
@@ -104,6 +105,6 @@ func RunPhishModule() {
 		fmt.Println(tui.RenderInfo(fmt.Sprintf("Starting %s phishing server on port 8080...", m.chosen)))
 		fmt.Println(tui.RenderWarning("Credentials will be logged to phishing_creds.txt"))
 		fmt.Println()
-		Launch(m.chosen, 8080)
+		web.Launch(m.chosen, 8080)
 	}
 }
