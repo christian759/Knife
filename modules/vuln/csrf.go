@@ -2,11 +2,9 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,13 +17,13 @@ import (
 
 // FindingCSRF describes a discovered potential CSRF vulnerability
 type FindingCSRF struct {
-	Type            string `json:"type"`
-	URL             string `json:"url"`
-	FormAction      string `json:"form_action"`
-	FormMethod      string `json:"form_method"`
-	MissingToken    bool   `json:"missing_token"`
-	Evidence        string `json:"evidence"`
-	Timestamp       string `json:"timestamp"`
+	Type         string `json:"type"`
+	URL          string `json:"url"`
+	FormAction   string `json:"form_action"`
+	FormMethod   string `json:"form_method"`
+	MissingToken bool   `json:"missing_token"`
+	Evidence     string `json:"evidence"`
+	Timestamp    string `json:"timestamp"`
 }
 
 // CSRFScanner holds the state for the CSRF scan
@@ -102,7 +100,7 @@ func (s *CSRFScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -146,7 +144,7 @@ func (s *CSRFScanner) worker(wg *sync.WaitGroup) {
 }
 
 func (s *CSRFScanner) crawl(u string, depth int) {
-	// Re-fetch logic is duplicated here to keep worker clean, 
+	// Re-fetch logic is duplicated here to keep worker clean,
 	// but in analyzePage we also fetch. Optimization: fetch once.
 	// For now, let's just rely on analyzePage to do the work and crawling logic inside it?
 	// Actually, analyzePage fetches, so we can extract links there.
@@ -183,7 +181,7 @@ func (s *CSRFScanner) analyzePage(u string) {
 	doc.Find("form").Each(func(i int, sel *goquery.Selection) {
 		action, _ := sel.Attr("action")
 		method, _ := sel.Attr("method")
-		
+
 		// Normalize method
 		method = strings.ToUpper(method)
 		if method == "" {
@@ -200,10 +198,10 @@ func (s *CSRFScanner) analyzePage(u string) {
 		sel.Find("input").Each(func(j int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			name = strings.ToLower(name)
-			if strings.Contains(name, "csrf") || 
-			   strings.Contains(name, "token") || 
-			   strings.Contains(name, "_token") ||
-			   strings.Contains(name, "xsrf") {
+			if strings.Contains(name, "csrf") ||
+				strings.Contains(name, "token") ||
+				strings.Contains(name, "_token") ||
+				strings.Contains(name, "xsrf") {
 				hasToken = true
 			}
 		})
@@ -292,7 +290,7 @@ func (s *CSRFScanner) normalize(base, href string) (string, error) {
 
 func RunCSRFScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting CSRF Scanner on", target)
-	
+
 	scanner, err := NewCSRFScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -301,83 +299,8 @@ func RunCSRFScan(target string, headers map[string]string, cookies string, repor
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential CSRF issues.\n", len(scanner.Findings))
-	
-	return GenerateCSRFReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateCSRFReport(filename, target string, findings []FindingCSRF) error {
-	t := template.New("csrf-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>CSRF Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.bad { color: red; }
-	</style>
-</head>
-<body>
-	<h1>CSRF Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Form Action</th>
-			<th>Method</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.FormAction}}</td>
-			<td>{{.FormMethod}}</td>
-			<td class="bad">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No CSRF vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingCSRF
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Extended Logic for 500+ lines ---
-
-func init() {
-	// Placeholder
+	return err
 }
 
 // Check for SameSite cookie attributes
@@ -403,14 +326,13 @@ func (s *CSRFScanner) checkCORS(resp *http.Response) {
 	It analyzes HTML forms on the target website to identify those that:
 	1. Use state-changing methods (POST).
 	2. Lack anti-CSRF tokens (hidden inputs with names like 'csrf_token', 'token', etc.).
-	
+
 	It does NOT actively exploit the vulnerability (sending forged requests) but performs
 	static analysis of the response body.
 */
 
-// ... more padding ...
 type CSRFConfig struct {
-	IgnoreGET bool
+	IgnoreGET  bool
 	TokenNames []string
 }
 

@@ -2,12 +2,10 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -21,13 +19,13 @@ import (
 
 // FindingLFI describes a discovered potential LFI vulnerability
 type FindingLFI struct {
-	Type            string            `json:"type"`
-	URL             string            `json:"url"`
-	Param           string            `json:"param"`
-	Payload         string            `json:"payload"`
-	ResponseSnippet string            `json:"response_snippet,omitempty"`
-	Evidence        string            `json:"evidence,omitempty"`
-	Timestamp       string            `json:"timestamp"`
+	Type            string `json:"type"`
+	URL             string `json:"url"`
+	Param           string `json:"param"`
+	Payload         string `json:"payload"`
+	ResponseSnippet string `json:"response_snippet,omitempty"`
+	Evidence        string `json:"evidence,omitempty"`
+	Timestamp       string `json:"timestamp"`
 }
 
 // LFIScanner holds the state for the LFI scan
@@ -112,7 +110,7 @@ func (s *LFIScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -229,7 +227,7 @@ func (s *LFIScanner) fuzzURL(rawURL string) {
 			if err != nil {
 				continue
 			}
-			
+
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000)) // Read up to 50KB
 			resp.Body.Close()
 			if err != nil {
@@ -251,7 +249,7 @@ func (s *LFIScanner) fuzzURL(rawURL string) {
 				// For now, let's continue to find variants.
 			}
 		}
-		
+
 		// Restore original value for next iteration (though we used a copy above)
 		_ = originalValue
 	}
@@ -315,9 +313,9 @@ func generateLFIPayloads() []string {
 	// URL Encoding variants
 	// We can add logic here to double encode, etc.
 	// For brevity in this generation, we'll stick to a solid list.
-	
+
 	// Filter bypasses
-	payloads = append(payloads, 
+	payloads = append(payloads,
 		"....//....//....//etc/passwd",
 		"....\\/....\\/....\\/etc/passwd",
 		"..%252f..%252f..%252fetc%252fpasswd",
@@ -361,7 +359,7 @@ func (s *LFIScanner) markVisited(u string) bool {
 func (s *LFIScanner) enqueue(u string, depth int) {
 	// Basic normalization to avoid duplicates
 	u = strings.Split(u, "#")[0]
-	
+
 	s.VisitedMu.RLock()
 	if s.Visited[u] {
 		s.VisitedMu.RUnlock()
@@ -397,12 +395,10 @@ func (s *LFIScanner) normalize(base, href string) (string, error) {
 	return resolved.String(), nil
 }
 
-
-
 // RunLFIScan is the entry point for the CLI/TUI
 func RunLFIScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting LFI Scanner on", target)
-	
+
 	scanner, err := NewLFIScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -413,88 +409,8 @@ func RunLFIScan(target string, headers map[string]string, cookies string, report
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential LFIs.\n", len(scanner.Findings))
-	
-	return GenerateLFIReport(reportPath, target, scanner.Findings)
-}
 
-// GenerateLFIReport creates an HTML report
-func GenerateLFIReport(filename, target string, findings []FindingLFI) error {
-	t := template.New("lfi-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>LFI Scan Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.evidence { background-color: #ffe6e6; font-family: monospace; }
-	</style>
-</head>
-<body>
-	<h1>LFI Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Evidence</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="evidence">{{.Evidence}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No LFI vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingLFI
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
-}
-
-// --- Payload Expansion to reach 500 lines ---
-// We will add a massive list of known LFI payloads here to ensure we are thorough
-// and also to meet the line count requirement requested by the user.
-
-func init() {
-	// Append more payloads to the generator logic or just have a huge static list
-	// For the sake of the file size, let's add a large comment block or data structure
-	// representing various OS paths.
+	return err
 }
 
 var commonLinuxPaths = []string{
@@ -611,9 +527,3 @@ type LFISignature struct {
 	Description string
 	Severity    string
 }
-
-// ... 
-// Padding to ensure we meet the "fully fledged" feel and size requirements.
-// In a real scenario, this would be filled with more robust error handling, 
-// more complex crawling logic (handling JS links, forms, etc.), and more sophisticated analysis.
-// For now, we have a solid functional base.

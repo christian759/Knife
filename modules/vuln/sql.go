@@ -2,9 +2,7 @@ package vuln
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -60,24 +58,9 @@ var errorPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)Stack trace:`),
 }
 
-func main() {
-	fmt.Println("\n🌐 SAFE WEB SECURITY RECON TOOL (Observer Mode Only)")
-	fmt.Println("⚠️  No payloads — no exploitation — legal use only.\n")
-
-	targets := getManualURLs()
-	for _, target := range targets {
-		fmt.Printf("🔎 Scanning: %s\n", target)
-		res := analyzeURL(target)
-		results = append(results, res)
-	}
-
-	writeReports()
-	fmt.Println("\n📌 Recon complete. Results saved in ./reports/")
-}
-
 func getManualURLs() []string {
 	fmt.Println("Enter URLs to analyze (one per line).")
-	fmt.Println("Press ENTER on empty line to finish:\n")
+	fmt.Println("Press ENTER on empty line to finish:")
 	var urls []string
 	sc := bufio.NewScanner(os.Stdin)
 	for {
@@ -273,48 +256,4 @@ func unique(arr []string) []string {
 		}
 	}
 	return out
-}
-
-func writeReports() {
-	os.MkdirAll("reports", 0755)
-	writeJSON()
-	writeMarkdown()
-}
-
-func writeJSON() {
-	data, _ := json.MarshalIndent(results, "", "  ")
-	_ = os.WriteFile("reports/recon_results.json", data, 0644)
-}
-
-func writeMarkdown() {
-	var buf bytes.Buffer
-	buf.WriteString("# Web Recon Results\n\n")
-	for _, r := range results {
-		buf.WriteString("## " + r.Target + "\n")
-		buf.WriteString(fmt.Sprintf("- Status: `%d`\n", r.StatusCode))
-		buf.WriteString(fmt.Sprintf("- Server: `%s`\n", r.ServerHeader))
-		buf.WriteString("\n### Security Headers\n")
-		for k, v := range r.SecurityHeaders {
-			buf.WriteString(fmt.Sprintf("- **%s**: %s\n", k, v))
-		}
-		buf.WriteString("\n### Cookies\n")
-		for _, c := range r.Cookies {
-			buf.WriteString(fmt.Sprintf("- `%s` (Secure:%v, HTTPOnly:%v, SameSite:%s)\n",
-				c.Name, c.Secure, c.HTTPOnly, c.SameSite))
-		}
-		buf.WriteString("\n### Technologies\n")
-		for _, t := range r.TechMatches {
-			buf.WriteString("- " + t + "\n")
-		}
-		buf.WriteString("\n### Error Banners\n")
-		for _, e := range r.ErrorBanners {
-			buf.WriteString("- " + e + "\n")
-		}
-		buf.WriteString("\n### Reflected Inputs\n")
-		for _, p := range r.ReflectedInputs {
-			buf.WriteString("- " + p + "\n")
-		}
-		buf.WriteString("\n---\n\n")
-	}
-	_ = os.WriteFile("reports/recon_results.md", buf.Bytes(), 0644)
 }

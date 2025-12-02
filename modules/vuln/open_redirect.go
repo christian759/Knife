@@ -2,11 +2,9 @@ package vuln
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,12 +17,12 @@ import (
 
 // FindingRedirect describes a discovered potential Open Redirect
 type FindingRedirect struct {
-	Type            string `json:"type"`
-	URL             string `json:"url"`
-	Param           string `json:"param"`
-	Payload         string `json:"payload"`
+	Type             string `json:"type"`
+	URL              string `json:"url"`
+	Param            string `json:"param"`
+	Payload          string `json:"payload"`
 	RedirectLocation string `json:"redirect_location"`
-	Timestamp       string `json:"timestamp"`
+	Timestamp        string `json:"timestamp"`
 }
 
 // RedirectScanner holds the state for the Open Redirect scan
@@ -108,7 +106,7 @@ func (s *RedirectScanner) Run() {
 		s.PageCountMu.Lock()
 		done := s.PageCount >= s.MaxPages
 		s.PageCountMu.Unlock()
-		
+
 		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
 			if done {
 				break
@@ -157,13 +155,13 @@ func (s *RedirectScanner) crawl(u string, depth int) {
 	// Since our main client doesn't follow redirects, we might miss content if the start URL is a redirect.
 	// But for fuzzing, we want the non-following behavior.
 	// Let's assume we get a 200 OK for the crawlable page.
-	
+
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return
 	}
 	req.Header.Set("User-Agent", "Knife-Redirect-Scanner/1.0")
-	
+
 	resp, err := s.Client.Do(req)
 	if err != nil {
 		return
@@ -257,15 +255,15 @@ func (s *RedirectScanner) isExternalRedirect(loc, payload string) bool {
 	if loc == "" {
 		return false
 	}
-	
+
 	// Basic check: does the location contain our payload's domain?
 	// Our payloads usually target "evil.com" or "google.com"
-	
+
 	// If the payload was fully injected into the Location header
 	if strings.Contains(loc, "evil.com") || strings.Contains(loc, "google.com") {
 		return true
 	}
-	
+
 	// If the payload was "javascript:alert(1)"
 	if strings.HasPrefix(strings.ToLower(loc), "javascript:") {
 		return true
@@ -353,7 +351,7 @@ func (s *RedirectScanner) normalize(base, href string) (string, error) {
 
 func RunRedirectScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Open Redirect Scanner on", target)
-	
+
 	scanner, err := NewRedirectScanner(target, 10, 100, 3, 200*time.Millisecond)
 	if err != nil {
 		return err
@@ -362,77 +360,8 @@ func RunRedirectScan(target string, headers map[string]string, cookies string, r
 	scanner.Run()
 
 	fmt.Printf("[*] Scan complete. Found %d potential redirects.\n", len(scanner.Findings))
-	
-	return GenerateRedirectReport(reportPath, target, scanner.Findings)
-}
 
-func GenerateRedirectReport(filename, target string, findings []FindingRedirect) error {
-	t := template.New("redirect-report")
-	t, err := t.Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-	<title>Open Redirect Report - {{.Target}}</title>
-	<style>
-		body { font-family: sans-serif; margin: 20px; }
-		table { border-collapse: collapse; width: 100%; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #f2f2f2; }
-		.bad { color: red; }
-	</style>
-</head>
-<body>
-	<h1>Open Redirect Scan Report</h1>
-	<p>Target: {{.Target}}</p>
-	<p>Date: {{.Date}}</p>
-	
-	<h2>Findings</h2>
-	{{if .Findings}}
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>URL</th>
-			<th>Parameter</th>
-			<th>Payload</th>
-			<th>Redirect Location</th>
-		</tr>
-		{{range .Findings}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td><a href="{{.URL}}">{{.URL}}</a></td>
-			<td>{{.Param}}</td>
-			<td><code>{{.Payload}}</code></td>
-			<td class="bad">{{.RedirectLocation}}</td>
-		</tr>
-		{{end}}
-	</table>
-	{{else}}
-	<p>No Open Redirect vulnerabilities found.</p>
-	{{end}}
-</body>
-</html>
-`)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	data := struct {
-		Target   string
-		Date     string
-		Findings []FindingRedirect
-	}{
-		Target:   target,
-		Date:     time.Now().Format(time.RFC3339),
-		Findings: findings,
-	}
-
-	return t.Execute(f, data)
+	return err
 }
 
 // --- Extended Payloads and Logic for 500+ lines ---
@@ -464,12 +393,12 @@ func (s *RedirectScanner) isSameDomain(loc string) bool {
 	if err != nil {
 		return false // Can't parse, assume unsafe or invalid
 	}
-	
+
 	// If relative path, it's same domain
 	if u.Host == "" {
 		return true
 	}
-	
+
 	// Compare hosts
 	return strings.EqualFold(u.Host, s.StartURL.Host)
 }
@@ -479,13 +408,13 @@ func (s *RedirectScanner) isSameDomain(loc string) bool {
 	The RedirectScanner checks for Open Redirect vulnerabilities.
 	It works by injecting URLs into parameters and checking if the server responds
 	with a 3xx status code and a Location header matching the injected URL.
-	
+
 	It handles:
 	- Standard http/https redirects
 	- Protocol relative redirects (//evil.com)
 	- Javascript pseudo-protocol (javascript:alert(1))
 	- Data URI redirects
-	
+
 	It does NOT automatically follow redirects during the fuzzing phase to ensure
 	we can capture the immediate response from the server.
 */
@@ -501,14 +430,4 @@ type RedirectConfig struct {
 func (s *RedirectScanner) validateFinding(f FindingRedirect) bool {
 	// Double check logic could go here
 	return true
-}
-
-// Helper to check if a string is in a slice
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

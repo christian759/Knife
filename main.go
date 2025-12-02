@@ -3,9 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	// "os/exec" // No longer needed
-	// "strconv" // No longer needed
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
