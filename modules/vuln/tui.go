@@ -21,10 +21,9 @@ type vulnFormField struct {
 }
 
 type vulnFormModel struct {
-	fields   []vulnFormField
-	focused  int
-	done     bool
-	scanning bool
+	fields  []vulnFormField
+	focused int
+	done    bool
 }
 
 func newVulnFormModel() vulnFormModel {
@@ -328,25 +327,21 @@ func Interact() {
 		}
 	}
 
-	// Start scan
+	// Start comprehensive scan
 	fmt.Println()
-	fmt.Println(tui.RenderInfo(fmt.Sprintf("Starting vulnerability scan on: %s", target)))
-	fmt.Println(tui.RenderWarning("This may take a few seconds depending on server response time..."))
+	fmt.Println(tui.RenderInfo(fmt.Sprintf("Starting comprehensive vulnerability scan on: %s", target)))
+	fmt.Println(tui.RenderWarning("This will run ALL vulnerability scanners and may take several minutes..."))
 	fmt.Println()
+	time.Sleep(2 * time.Second)
 
-	// Output path
-	homeDir, _ := os.UserHomeDir()
-	reportFile := fmt.Sprintf("%s/%s_report_%d.html", homeDir,
-		strings.ReplaceAll(strings.ReplaceAll(target, "http://", ""), "https://", ""),
-		time.Now().Unix())
-
-	err = RunXSSScan(target, headers, cookies, reportFile)
+	err = RunAllVulnScanners(target, headers, cookies)
 	if err != nil {
 		fmt.Println(tui.RenderError(fmt.Sprintf("Scan failed: %v", err)))
 		return
 	}
 
-	fmt.Println(tui.RenderSuccess("Scan complete!"))
-	fmt.Println(tui.RenderInfo(fmt.Sprintf("HTML Report saved at: %s", reportFile)))
-	fmt.Println(tui.RenderHelp("You can open it in your browser to view detailed results."))
+	fmt.Println()
+	fmt.Println(tui.RenderSuccess("✓ Scan complete!"))
+	fmt.Println(tui.RenderInfo(fmt.Sprintf("Total findings: %d", len(allUnifiedFindings))))
+	fmt.Println(tui.RenderHelp("HTML report has been generated. Check your home directory."))
 }
