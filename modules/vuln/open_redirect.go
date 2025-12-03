@@ -50,17 +50,6 @@ type redirectCrawlJob struct {
 	Depth int
 }
 
-// init registers the Open Redirect check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "Open Redirect",
-		Param:   "next",
-		Payload: "//evil.com",
-		Match:   `evil\.com`,
-		Method:  "GET",
-	})
-}
-
 // NewRedirectScanner creates a new instance of the Redirect scanner
 func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*RedirectScanner, error) {
 	parsed, err := url.Parse(start)

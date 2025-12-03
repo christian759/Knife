@@ -53,17 +53,6 @@ type rceCrawlJob struct {
 	Depth int
 }
 
-// init registers the RCE check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "RCE (Basic)",
-		Param:   "cmd",
-		Payload: "echo knife",
-		Match:   `knife`,
-		Method:  "GET",
-	})
-}
-
 // NewRCEScanner creates a new instance of the RCE scanner
 func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*RCEScanner, error) {
 	parsed, err := url.Parse(start)

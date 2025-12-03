@@ -53,17 +53,6 @@ type cmdInjCrawlJob struct {
 	Depth int
 }
 
-// init registers the Command Injection check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "Command Injection",
-		Param:   "ip",
-		Payload: "127.0.0.1; cat /etc/passwd",
-		Match:   `root:x:0:0`,
-		Method:  "GET",
-	})
-}
-
 // NewCmdInjScanner creates a new instance of the Command Injection scanner
 func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*CmdInjScanner, error) {
 	parsed, err := url.Parse(start)

@@ -53,18 +53,6 @@ type lfiCrawlJob struct {
 	Depth int
 }
 
-// init registers the LFI check (simple version) and prepares the complex scanner
-func init() {
-	// Register simple check for the main vuln loop (backward compatibility)
-	vulns = append(vulns, VulnCheck{
-		Name:    "LFI",
-		Param:   "file",
-		Payload: "../../../../etc/passwd",
-		Match:   `root:x:0:0`,
-		Method:  "GET",
-	})
-}
-
 // NewLFIScanner creates a new instance of the LFI scanner
 func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*LFIScanner, error) {
 	parsed, err := url.Parse(start)

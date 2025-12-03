@@ -53,17 +53,6 @@ type traversalCrawlJob struct {
 	Depth int
 }
 
-// init registers the Directory Traversal check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "Directory Traversal",
-		Param:   "path",
-		Payload: "../../../../etc/passwd",
-		Match:   `root:x:0:0`,
-		Method:  "GET",
-	})
-}
-
 // NewTraversalScanner creates a new instance of the Traversal scanner
 func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*TraversalScanner, error) {
 	parsed, err := url.Parse(start)

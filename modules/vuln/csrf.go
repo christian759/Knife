@@ -50,17 +50,6 @@ type csrfCrawlJob struct {
 	Depth int
 }
 
-// init registers the CSRF check
-func init() {
-	vulns = append(vulns, VulnCheck{
-		Name:    "CSRF",
-		Param:   "",
-		Payload: "",
-		Match:   `Set-Cookie`,
-		Method:  "GET",
-	})
-}
-
 // NewCSRFScanner creates a new instance of the CSRF scanner
 func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*CSRFScanner, error) {
 	parsed, err := url.Parse(start)
