@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type ReconResult struct {
+type FindingSQL struct {
 	Target          string            `json:"target"`
 	StatusCode      int               `json:"status_code"`
 	ServerHeader    string            `json:"server_header"`
@@ -33,7 +33,7 @@ type CookieInfo struct {
 	SameSite string `json:"same_site"`
 }
 
-var results []ReconResult
+var results []FindingSQL
 var client = &http.Client{Timeout: 20 * time.Second}
 
 var techPatterns = map[string]*regexp.Regexp{
@@ -74,8 +74,8 @@ func getManualURLs() []string {
 	return urls
 }
 
-func analyzeURL(target string) ReconResult {
-	result := ReconResult{Target: target}
+func analyzeURL(target string) FindingSQL {
+	result := FindingSQL{Target: target}
 	u, err := url.Parse(target)
 	if err != nil {
 		fmt.Println("❌ Invalid URL:", target)

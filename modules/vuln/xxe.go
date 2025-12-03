@@ -350,18 +350,3 @@ func (s *XXEScanner) normalize(base, href string) (string, error) {
 	resolved := b.ResolveReference(h)
 	return resolved.String(), nil
 }
-
-func RunXXEScan(target string, headers map[string]string, cookies string, reportPath string) error {
-	fmt.Println("[*] Starting XXE Scanner on", target)
-
-	scanner, err := NewXXEScanner(target, 10, 100, 3, 200*time.Millisecond)
-	if err != nil {
-		return err
-	}
-
-	scanner.Run()
-
-	fmt.Printf("[*] Scan complete. Found %d potential XXEs.\n", len(scanner.Findings))
-
-	return err
-}

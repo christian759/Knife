@@ -334,18 +334,3 @@ func (s *SSRFScanner) normalize(base, href string) (string, error) {
 	resolved := b.ResolveReference(h)
 	return resolved.String(), nil
 }
-
-func RunSSRFScan(target string, headers map[string]string, cookies string, reportPath string) error {
-	fmt.Println("[*] Starting SSRF Scanner on", target)
-
-	scanner, err := NewSSRFScanner(target, 10, 100, 3, 200*time.Millisecond)
-	if err != nil {
-		return err
-	}
-
-	scanner.Run()
-
-	fmt.Printf("[*] Scan complete. Found %d potential SSRFs.\n", len(scanner.Findings))
-
-	return err
-}

@@ -40,8 +40,8 @@ type PostedPayload struct {
 	Marker string
 }
 
-// Scanner holds scanning state
-type Scanner struct {
+// XSSScanner holds scanning state
+type XSSScanner struct {
 	StartURL      *url.URL
 	Client        *http.Client
 	Visited       map[string]bool
@@ -110,13 +110,13 @@ func defaultPayloads() ([]string, []string) {
 }
 
 // create scanner
-func newScanner(start string, workers, maxPages, maxDepth int, intensity string, useChrome bool, throttle time.Duration) (*Scanner, error) {
+func newScanner(start string, workers, maxPages, maxDepth int, intensity string, useChrome bool, throttle time.Duration) (*XSSScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
 	}
 	client := &http.Client{Timeout: 20 * time.Second}
-	s := &Scanner{
+	s := &XSSScanner{
 		StartURL:  parsed,
 		Client:    client,
 		Visited:   make(map[string]bool),
@@ -143,7 +143,7 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity string,
 }
 
 // add finding
-func (s *Scanner) addFinding(f FindingXSS) {
+func (s *XSSScanner) addFinding(f FindingXSS) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
 	f.Timestamp = time.Now().UTC().Format(time.RFC3339)
@@ -152,14 +152,14 @@ func (s *Scanner) addFinding(f FindingXSS) {
 }
 
 // mark posted for stored detection
-func (s *Scanner) recordPosted(p PostedPayload) {
+func (s *XSSScanner) recordPosted(p PostedPayload) {
 	s.PostedMu.Lock()
 	s.Posted = append(s.Posted, p)
 	s.PostedMu.Unlock()
 }
 
 // mark visited
-func (s *Scanner) markVisited(u string) bool {
+func (s *XSSScanner) markVisited(u string) bool {
 	s.VisitedMu.Lock()
 	defer s.VisitedMu.Unlock()
 	if s.Visited[u] {
@@ -173,7 +173,7 @@ func (s *Scanner) markVisited(u string) bool {
 }
 
 // same origin check
-func (s *Scanner) sameOrigin(u *url.URL) bool {
+func (s *XSSScanner) sameOrigin(u *url.URL) bool {
 	return u.Scheme == s.StartURL.Scheme && eqHost(u.Host, s.StartURL.Host)
 }
 
@@ -183,7 +183,7 @@ func eqHost(a, b string) bool {
 }
 
 // normalize and ensure same origin, remove fragment
-func (s *Scanner) normalize(base, href string) (string, error) {
+func (s *XSSScanner) normalize(base, href string) (string, error) {
 	if href == "" {
 		return "", fmt.Errorf("empty")
 	}
@@ -207,7 +207,7 @@ func (s *Scanner) normalize(base, href string) (string, error) {
 }
 
 // fetch a URL with headers
-func (s *Scanner) fetch(u string, extra map[string]string) (int, string, string, error) {
+func (s *XSSScanner) fetch(u string, extra map[string]string) (int, string, string, error) {
 	// throttle
 	if s.Throttle > 0 {
 		time.Sleep(s.Throttle)
@@ -232,7 +232,7 @@ func (s *Scanner) fetch(u string, extra map[string]string) (int, string, string,
 }
 
 // post form urlencoded
-func (s *Scanner) postForm(u string, data url.Values, extra map[string]string) (int, string, string, error) {
+func (s *XSSScanner) postForm(u string, data url.Values, extra map[string]string) (int, string, string, error) {
 	if s.Throttle > 0 {
 		time.Sleep(s.Throttle)
 	}
@@ -277,7 +277,7 @@ func snippetAround(body, marker string, r int) string {
 }
 
 // fuzz URL params
-func (s *Scanner) fuzzParams(rawurl string) {
+func (s *XSSScanner) fuzzParams(rawurl string) {
 	parsed, err := url.Parse(rawurl)
 	if err != nil {
 		return
@@ -351,7 +351,7 @@ func htmlEscape(s string) string {
 }
 
 // fuzz forms on a page
-func (s *Scanner) fuzzForms(pageURL, body string) {
+func (s *XSSScanner) fuzzForms(pageURL, body string) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	if err != nil {
 		return
@@ -456,7 +456,7 @@ func (s *Scanner) fuzzForms(pageURL, body string) {
 }
 
 // analyze response for stored markers
-func (s *Scanner) analyzeForStoredMarkers(pageURL, body string) {
+func (s *XSSScanner) analyzeForStoredMarkers(pageURL, body string) {
 	s.PostedMu.Lock()
 	defer s.PostedMu.Unlock()
 	for _, p := range s.Posted {
@@ -477,7 +477,7 @@ func (s *Scanner) analyzeForStoredMarkers(pageURL, body string) {
 }
 
 // dom check using chromedp
-func (s *Scanner) domCheck(u string) {
+func (s *XSSScanner) domCheck(u string) {
 	if !s.UseChrome || s.Chromectx == nil {
 		return
 	}
@@ -521,7 +521,7 @@ func (s *Scanner) domCheck(u string) {
 }
 
 // worker
-func (s *Scanner) worker(wg *sync.WaitGroup) {
+func (s *XSSScanner) worker(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for job := range s.Queue {
 		atomic.AddInt32(&s.Active, 1)
@@ -598,7 +598,7 @@ func (s *Scanner) worker(wg *sync.WaitGroup) {
 }
 
 // enqueue helper
-func (s *Scanner) enqueue(u string, depth int) {
+func (s *XSSScanner) enqueue(u string, depth int) {
 	u = strings.Split(u, "#")[0]
 	s.VisitedMu.RLock()
 	if s.Visited[u] {
@@ -621,7 +621,7 @@ func (s *Scanner) enqueue(u string, depth int) {
 }
 
 // run scanning
-func (s *Scanner) run() {
+func (s *XSSScanner) run() {
 	var wg sync.WaitGroup
 	for i := 0; i < s.Workers; i++ {
 		wg.Add(1)
@@ -654,42 +654,4 @@ func (s *Scanner) run() {
 	if s.ChromeCancel != nil {
 		s.ChromeCancel()
 	}
-}
-
-// RunXSSScan is a wrapper to integrate with the TUI
-func RunXSSScan(target string, headers map[string]string, cookies string, reportPath string) error {
-	// intensity: basic | full | both
-	intensity := "both"
-
-	// chrome dom check disabled by default (TUI shouldn't force chrome)
-	useChrome := false
-
-	scanner, err := newScanner(target,
-		10,                   // workers
-		200,                  // max pages
-		6,                    // max depth
-		intensity,            // intensity
-		useChrome,            // dom check
-		300*time.Millisecond, // throttle
-	)
-	if err != nil {
-		return err
-	}
-
-	// add headers + cookies
-	extra := map[string]string{}
-	for k, v := range headers {
-		extra[k] = v
-	}
-	if cookies != "" {
-		extra["Cookie"] = cookies
-	}
-
-	// start scan
-
-	// wait
-	scanner.run()
-
-	// generate HTML report
-	return err
 }
