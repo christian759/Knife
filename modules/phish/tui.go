@@ -2,6 +2,7 @@ package phish
 
 import (
 	"fmt"
+	"knife/modules/phish/mail"
 	"knife/modules/phish/web"
 	"knife/tui"
 	"os"
@@ -12,7 +13,8 @@ import (
 )
 
 const (
-	PagePhishing = "Web Page Phishing"
+	PagePhishing  = "Web Page Phishing"
+	EmailPhishing = "Email Phishing"
 )
 
 type templateItem struct {
@@ -63,7 +65,11 @@ func RunPhishModule() {
 	items := []list.Item{
 		templateItem{
 			title:       PagePhishing,
-			description: "Facebook login page phishing template",
+			description: "login page phishing template",
+		},
+		templateItem{
+			title:       EmailPhishing,
+			description: "email phishing template",
 		},
 	}
 
@@ -90,6 +96,8 @@ func RunPhishModule() {
 		switch m.chosen {
 		case PagePhishing:
 			web.RunPagePhishModule()
+		case EmailPhishing:
+			mail.RunEmailPhishModule()
 		}
 	}
 }
