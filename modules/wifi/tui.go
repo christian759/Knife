@@ -644,6 +644,84 @@ func runPMKID() {
 	}
 }
 
+// Sniffer Model
+type sniffMsg string
+type sniffFinishedMsg struct{}
+
+type snifferModel struct {
+	list      list.Model
+	sub       chan string
+	listening bool
+	err       error
+}
+
+func waitForPacket(sub chan string) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-sub
+		if !ok {
+			return sniffFinishedMsg{}
+		}
+		return sniffMsg(msg)
+	}
+}
+
+func initialSnifferModel(iface string, timeout time.Duration) snifferModel {
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = tui.SelectedItemStyle
+	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
+
+	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.Title = "👃 Packet Sniffer"
+	l.Styles.Title = tui.TitleStyle
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(true)
+
+	sub := make(chan string)
+	
+	// Start sniffer in goroutine
+	go func() {
+		defer close(sub)
+		SniffProbes(iface, timeout, sub)
+	}()
+
+	return snifferModel{
+		list:      l,
+		sub:       sub,
+		listening: true,
+	}
+}
+
+func (m snifferModel) Init() tea.Cmd {
+	return tea.Batch(list.NewSpinner().Tick, waitForPacket(m.sub))
+}
+
+func (m snifferModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "q" || msg.String() == "esc" {
+			return m, tea.Quit
+		}
+	case tea.WindowSizeMsg:
+		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v)
+	case sniffMsg:
+		m.list.InsertItem(0, scanItem{ssid: string(msg)}) // Reuse scanItem for simplicity
+		return m, waitForPacket(m.sub)
+	case sniffFinishedMsg:
+		m.listening = false
+		m.list.Title = "👃 Sniffing Complete"
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m snifferModel) View() string {
+	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+}
+
 func runSniffer() {
 	ifaces, err := GetWirelessInterfaces()
 	if err != nil || len(ifaces) == 0 {
@@ -653,11 +731,10 @@ func runSniffer() {
 
 	form := newFormModel(
 		"Packet Sniffer",
-		"Sniff probe requests or all packets",
+		"Sniff probe requests",
 		[]formField{
 			{label: "Interface", placeholder: ifaces[0]},
-			{label: "Probe requests only? (y/n)", placeholder: "y"},
-			{label: "Timeout (seconds, for probes)", placeholder: "30"},
+			{label: "Timeout (seconds)", placeholder: "30"},
 		},
 	)
 
@@ -669,54 +746,115 @@ func runSniffer() {
 
 	if m, ok := finalModel.(formModel); ok && m.done {
 		iface := m.fields[0].value
-		probeOnly := strings.ToLower(m.fields[1].value) == "y"
-		timeout, _ := strconv.Atoi(m.fields[2].value)
+		timeout, _ := strconv.Atoi(m.fields[1].value)
 		IsRootOrSudoRelaunch()
 
-		fmt.Println()
-		if probeOnly {
-			fmt.Println(tui.RenderInfo("Sniffing probe requests..."))
-			SniffProbes(iface, time.Duration(timeout)*time.Second)
-		} else {
-			fmt.Println(tui.RenderInfo("Starting packet sniffer (Ctrl+C to stop)..."))
-			StartPacketSniffer(iface)
+		// Run the sniffer TUI
+		sniffer := initialSnifferModel(iface, time.Duration(timeout)*time.Second)
+		p := tea.NewProgram(sniffer, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error running sniffer: %v\n", err)
 		}
 	}
 }
 
+// Scan Result Item
+type scanItem struct {
+	ssid string
+}
+
+func (i scanItem) Title() string       { return i.ssid }
+func (i scanItem) Description() string { return "WiFi Network" }
+func (i scanItem) FilterValue() string { return i.ssid }
+
+type scanModel struct {
+	list     list.Model
+	scanning bool
+	err      error
+}
+
+type scanResultMsg []string
+type scanErrorMsg error
+
+func scanNetworksCmd() tea.Cmd {
+	return func() tea.Msg {
+		ifaces, err := GetWirelessInterfaces()
+		if err != nil || len(ifaces) == 0 {
+			return scanErrorMsg(fmt.Errorf("no wireless interfaces found"))
+		}
+		
+		// Scan on first interface for now
+		// In a full implementation we might want to scan on all or let user choose
+		ssids, err := ScanNetworks(ifaces[0])
+		if err != nil {
+			return scanErrorMsg(err)
+		}
+		return scanResultMsg(ssids)
+	}
+}
+
+func initialScanModel() scanModel {
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = tui.SelectedItemStyle
+	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
+
+	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.Title = "📡 Scanning Networks..."
+	l.Styles.Title = tui.TitleStyle
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(true)
+
+	return scanModel{
+		list:     l,
+		scanning: true,
+	}
+}
+
+func (m scanModel) Init() tea.Cmd {
+	return tea.Batch(list.NewSpinner().Tick, scanNetworksCmd())
+}
+
+func (m scanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "q" || msg.String() == "esc" {
+			return m, tea.Quit
+		}
+	case tea.WindowSizeMsg:
+		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v)
+	case scanResultMsg:
+		m.scanning = false
+		m.list.Title = fmt.Sprintf("📡 Found %d Networks", len(msg))
+		items := make([]list.Item, len(msg))
+		for i, ssid := range msg {
+			items[i] = scanItem{ssid: ssid}
+		}
+		m.list.SetItems(items)
+		return m, nil
+	case scanErrorMsg:
+		m.scanning = false
+		m.err = msg
+		m.list.Title = "❌ Scan Failed"
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m scanModel) View() string {
+	if m.err != nil {
+		return lipgloss.NewStyle().Margin(1, 2).Render(tui.RenderError(m.err.Error()) + "\n\nPress q to quit")
+	}
+	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+}
+
 func runScanner() {
-	ifaces, err := GetWirelessInterfaces()
-	if err != nil || len(ifaces) == 0 {
-		fmt.Println(tui.RenderError("No wireless interfaces detected"))
-		return
-	}
 	IsRootOrSudoRelaunch()
-
-	fmt.Println()
-	fmt.Println(tui.RenderInfo("Scanning for nearby networks..."))
-	fmt.Println()
-
-	var wg sync.WaitGroup
-	for _, iface := range ifaces {
-		wg.Add(1)
-		go func(ifn string) {
-			defer wg.Done()
-			fmt.Printf("\n%s\n", tui.RenderSubtitle("Interface: "+ifn))
-			ssids, err := ScanNetworks(ifn)
-			if err != nil {
-				fmt.Println(tui.RenderError("Scan error: " + err.Error()))
-				return
-			}
-			if len(ssids) == 0 {
-				fmt.Println(tui.RenderWarning("No SSIDs found"))
-				return
-			}
-			for _, s := range ssids {
-				fmt.Println("  • " + s)
-			}
-		}(iface)
+	p := tea.NewProgram(initialScanModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running scanner: %v\n", err)
 	}
-	wg.Wait()
-	fmt.Println()
-	fmt.Println(tui.RenderSuccess("Scan complete"))
 }
