@@ -791,7 +791,7 @@ func runDeepAnalysis() {
 			return
 		}
 		
-		PrintAnalysis(analysis)
+		fmt.Print(FormatAnalysis(analysis))
 	}
 }
 
@@ -831,18 +831,13 @@ func runNetworkCapture() {
 
 	if m, ok := finalModel.(networkCaptureModel); ok && m.submitted {
 		fmt.Println()
-		DisplayNetworkCaptureInstructions(m.guide)
+		fmt.Print(FormatNetworkCaptureInstructions(m.guide))
 
 		// Ask about ADB proxy configuration
-		fmt.Println("\nConfigure proxy via ADB? (y/n): ")
-		var configure string
-		fmt.Scanln(&configure)
-
-		if strings.ToLower(configure) == "y" {
-			if err := SetupADBProxy(m.guide.ProxyIP, m.guide.ProxyPort); err != nil {
-				fmt.Println(tui.RenderError(fmt.Sprintf("Failed to set proxy: %v", err)))
-			}
-		}
+		// For pure TUI, we'll just show the instructions for now
+		// In a future update, we can add a TUI confirmation model here
+		fmt.Println("\nTo configure proxy via ADB automatically, run:")
+		fmt.Printf("adb shell settings put global http_proxy %s:%s\n", m.guide.ProxyIP, m.guide.ProxyPort)
 	}
 }
 
@@ -881,27 +876,29 @@ func runBackup() {
 		}
 
 		// Extract backup
-		fmt.Println("\nExtract backup? (y/n): ")
-		var extract string
-		fmt.Scanln(&extract)
+		// Use a TUI confirmation for extraction
+		fmt.Println("\nExtracting backup automatically...")
+		
+		tarFile, err := ExtractBackup(outputPath)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Extraction failed: %v", err)))
+			return
+		}
 
-		if strings.ToLower(extract) == "y" {
-			tarFile, err := ExtractBackup(outputPath)
-			if err != nil {
-				fmt.Println(tui.RenderError(fmt.Sprintf("Extraction failed: %v", err)))
-				return
-			}
+		// List contents
+		contentStr, err := FormatBackupContents(tarFile)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Failed to list contents: %v", err)))
+			return
+		}
+		fmt.Print(contentStr)
 
-			// List contents
-			if err := ListBackupContents(tarFile); err != nil {
-				fmt.Println(tui.RenderError(fmt.Sprintf("Failed to list contents: %v", err)))
-				return
-			}
-
-			// Security analysis
-			if err := AnalyzeBackupSecurity(tarFile); err != nil {
-				fmt.Println(tui.RenderError(fmt.Sprintf("Security analysis failed: %v", err)))
-			}
+		// Security analysis
+		analysisStr, err := FormatBackupSecurityAnalysis(tarFile)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Security analysis failed: %v", err)))
+		} else {
+			fmt.Print(analysisStr)
 		}
 	}
 }
@@ -925,7 +922,7 @@ func runSecurityScan() {
 			return
 		}
 		
-		PrintSecurityReport(result)
+		fmt.Print(FormatSecurityReport(result))
 	}
 }
 

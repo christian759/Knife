@@ -251,11 +251,13 @@ func checkObfuscation(apkPath string, result *SecurityScanResult) {
 	}
 }
 
-// PrintSecurityReport displays the security scan results
-func PrintSecurityReport(result *SecurityScanResult) {
-	fmt.Println("\n╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║              SECURITY SCAN RESULTS                         ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+// FormatSecurityReport returns the security scan results as a formatted string
+func FormatSecurityReport(result *SecurityScanResult) string {
+	var s strings.Builder
+
+	s.WriteString("\n╔════════════════════════════════════════════════════════════╗\n")
+	s.WriteString("║              SECURITY SCAN RESULTS                         ║\n")
+	s.WriteString("╚════════════════════════════════════════════════════════════╝\n")
 
 	// Count by severity
 	high, medium, low, info := 0, 0, 0, 0
@@ -272,29 +274,29 @@ func PrintSecurityReport(result *SecurityScanResult) {
 		}
 	}
 
-	fmt.Printf("\n📊 Summary:\n")
-	fmt.Printf("   Total Issues: %d\n", len(result.Issues))
+	s.WriteString(fmt.Sprintf("\n📊 Summary:\n"))
+	s.WriteString(fmt.Sprintf("   Total Issues: %d\n", len(result.Issues)))
 	if high > 0 {
-		fmt.Printf("   🔴 High:   %d\n", high)
+		s.WriteString(fmt.Sprintf("   🔴 High:   %d\n", high))
 	}
 	if medium > 0 {
-		fmt.Printf("   🟠 Medium: %d\n", medium)
+		s.WriteString(fmt.Sprintf("   🟠 Medium: %d\n", medium))
 	}
 	if low > 0 {
-		fmt.Printf("   🟡 Low:    %d\n", low)
+		s.WriteString(fmt.Sprintf("   🟡 Low:    %d\n", low))
 	}
 	if info > 0 {
-		fmt.Printf("   🔵 Info:   %d\n", info)
+		s.WriteString(fmt.Sprintf("   🔵 Info:   %d\n", info))
 	}
 
 	if len(result.Issues) == 0 {
-		fmt.Println("\n✅ No security issues detected!")
-		fmt.Println("   (This doesn't guarantee the app is secure - manual review recommended)")
-		return
+		s.WriteString("\n✅ No security issues detected!\n")
+		s.WriteString("   (This doesn't guarantee the app is secure - manual review recommended)\n")
+		return s.String()
 	}
 
-	fmt.Println("\n🔍 Detailed Findings:")
-	fmt.Println(strings.Repeat("─", 60))
+	s.WriteString("\n🔍 Detailed Findings:\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
 
 	for i, issue := range result.Issues {
 		// Icon based on severity
@@ -310,21 +312,23 @@ func PrintSecurityReport(result *SecurityScanResult) {
 			icon = "🔵"
 		}
 
-		fmt.Printf("\n%s [%s] %s\n", icon, issue.Severity, issue.Category)
-		fmt.Printf("   Issue: %s\n", issue.Description)
-		fmt.Printf("   Fix:   %s\n", issue.Remediation)
+		s.WriteString(fmt.Sprintf("\n%s [%s] %s\n", icon, issue.Severity, issue.Category))
+		s.WriteString(fmt.Sprintf("   Issue: %s\n", issue.Description))
+		s.WriteString(fmt.Sprintf("   Fix:   %s\n", issue.Remediation))
 		
 		if i < len(result.Issues)-1 {
-			fmt.Println(strings.Repeat("─", 60))
+			s.WriteString(strings.Repeat("─", 60) + "\n")
 		}
 	}
 
-	fmt.Println("\n" + strings.Repeat("─", 60))
-	fmt.Println("💡 Recommendations:")
-	fmt.Println("   • Address High severity issues immediately")
-	fmt.Println("   • Review Medium issues based on app context")
-	fmt.Println("   • Perform dynamic analysis with debugger/proxy")
-	fmt.Println("   • Conduct code review for hardcoded secrets")
-	fmt.Println("   • Test for SQL injection and XSS vulnerabilities")
-	fmt.Println("\n✓ Security scan complete")
+	s.WriteString("\n" + strings.Repeat("─", 60) + "\n")
+	s.WriteString("💡 Recommendations:\n")
+	s.WriteString("   • Address High severity issues immediately\n")
+	s.WriteString("   • Review Medium issues based on app context\n")
+	s.WriteString("   • Perform dynamic analysis with debugger/proxy\n")
+	s.WriteString("   • Conduct code review for hardcoded secrets\n")
+	s.WriteString("   • Test for SQL injection and XSS vulnerabilities\n")
+	s.WriteString("\n✓ Security scan complete\n")
+	
+	return s.String()
 }

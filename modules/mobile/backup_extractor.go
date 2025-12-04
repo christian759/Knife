@@ -128,19 +128,20 @@ with open('%s', 'wb') as f:
 	return tarFile, nil
 }
 
-// ListBackupContents lists files in the extracted backup
-func ListBackupContents(tarFile string) error {
+// FormatBackupContents lists files in the extracted backup and returns as string
+func FormatBackupContents(tarFile string) (string, error) {
 	if _, err := os.Stat(tarFile); os.IsNotExist(err) {
-		return fmt.Errorf("tar file not found: %s", tarFile)
+		return "", fmt.Errorf("tar file not found: %s", tarFile)
 	}
 
-	fmt.Println("\n📋 Backup Contents:")
-	fmt.Println(strings.Repeat("─", 60))
+	var s strings.Builder
+	s.WriteString("\n📋 Backup Contents:\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
 
 	cmd := exec.Command("tar", "-tzf", tarFile)
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to list tar contents: %v", err)
+		return "", fmt.Errorf("failed to list tar contents: %v", err)
 	}
 
 	files := strings.Split(string(output), "\n")
@@ -165,36 +166,36 @@ func ListBackupContents(tarFile string) error {
 	}
 
 	if len(databases) > 0 {
-		fmt.Printf("\n🗄️  Databases (%d):\n", len(databases))
+		s.WriteString(fmt.Sprintf("\n🗄️  Databases (%d):\n", len(databases)))
 		for _, db := range databases {
-			fmt.Printf("   • %s\n", filepath.Base(db))
+			s.WriteString(fmt.Sprintf("   • %s\n", filepath.Base(db)))
 		}
 	}
 
 	if len(sharedPrefs) > 0 {
-		fmt.Printf("\n⚙️  Shared Preferences (%d):\n", len(sharedPrefs))
+		s.WriteString(fmt.Sprintf("\n⚙️  Shared Preferences (%d):\n", len(sharedPrefs)))
 		for _, pref := range sharedPrefs {
-			fmt.Printf("   • %s\n", filepath.Base(pref))
+			s.WriteString(fmt.Sprintf("   • %s\n", filepath.Base(pref)))
 		}
 	}
 
 	if len(otherFiles) > 0 {
-		fmt.Printf("\n📄 Other Files (%d):\n", len(otherFiles))
+		s.WriteString(fmt.Sprintf("\n📄 Other Files (%d):\n", len(otherFiles)))
 		displayed := 0
 		for _, file := range otherFiles {
 			if displayed < 20 { // Limit display
-				fmt.Printf("   • %s\n", file)
+				s.WriteString(fmt.Sprintf("   • %s\n", file))
 				displayed++
 			}
 		}
 		if len(otherFiles) > 20 {
-			fmt.Printf("   ... and %d more files\n", len(otherFiles)-20)
+			s.WriteString(fmt.Sprintf("   ... and %d more files\n", len(otherFiles)-20))
 		}
 	}
 
-	fmt.Printf("\nTotal files: %d\n", len(files)-1)
+	s.WriteString(fmt.Sprintf("\nTotal files: %d\n", len(files)-1))
 	
-	return nil
+	return s.String(), nil
 }
 
 // ExtractFileFromBackup extracts a specific file from the backup
@@ -221,15 +222,16 @@ func ExtractFileFromBackup(tarFile, targetFile, outputDir string) error {
 	return nil
 }
 
-// AnalyzeBackupSecurity performs security analysis on backup contents
-func AnalyzeBackupSecurity(tarFile string) error {
-	fmt.Println("\n🔍 Security Analysis:")
-	fmt.Println(strings.Repeat("─", 60))
+// FormatBackupSecurityAnalysis performs security analysis on backup contents and returns report
+func FormatBackupSecurityAnalysis(tarFile string) (string, error) {
+	var s strings.Builder
+	s.WriteString("\n🔍 Security Analysis:\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
 
 	cmd := exec.Command("tar", "-tzf", tarFile)
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to read tar: %v", err)
+		return "", fmt.Errorf("failed to read tar: %v", err)
 	}
 
 	files := strings.Split(string(output), "\n")
@@ -250,25 +252,25 @@ func AnalyzeBackupSecurity(tarFile string) error {
 	}
 
 	if len(issues) > 0 {
-		fmt.Println("⚠️  Potential Security Issues Found:")
+		s.WriteString("⚠️  Potential Security Issues Found:\n")
 		for i, issue := range issues {
 			if i < 10 { // Limit display
-				fmt.Printf("   %d. %s\n", i+1, issue)
+				s.WriteString(fmt.Sprintf("   %d. %s\n", i+1, issue))
 			}
 		}
 		if len(issues) > 10 {
-			fmt.Printf("   ... and %d more issues\n", len(issues)-10)
+			s.WriteString(fmt.Sprintf("   ... and %d more issues\n", len(issues)-10))
 		}
 	} else {
-		fmt.Println("✓ No obvious security issues detected")
-		fmt.Println("  (Manual review still recommended)")
+		s.WriteString("✓ No obvious security issues detected\n")
+		s.WriteString("  (Manual review still recommended)\n")
 	}
 
-	fmt.Println("\n💡 Recommended Actions:")
-	fmt.Println("   • Extract and examine database files with SQLite browser")
-	fmt.Println("   • Review shared_prefs XML files for hardcoded credentials")
-	fmt.Println("   • Check for unencrypted sensitive data")
-	fmt.Println("   • Verify proper data encryption is implemented")
+	s.WriteString("\n💡 Recommended Actions:\n")
+	s.WriteString("   • Extract and examine database files with SQLite browser\n")
+	s.WriteString("   • Review shared_prefs XML files for hardcoded credentials\n")
+	s.WriteString("   • Check for unencrypted sensitive data\n")
+	s.WriteString("   • Verify proper data encryption is implemented\n")
 
-	return nil
+	return s.String(), nil
 }

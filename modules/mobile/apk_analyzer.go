@@ -194,19 +194,21 @@ func parseManifest(output string, analysis *APKAnalysis) {
 	}
 }
 
-// PrintAnalysis displays the analysis results
-func PrintAnalysis(analysis *APKAnalysis) {
-	fmt.Println("\n╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║             APK DEEP ANALYSIS REPORT                       ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+// FormatAnalysis returns the analysis results as a formatted string
+func FormatAnalysis(analysis *APKAnalysis) string {
+	var s strings.Builder
+	
+	s.WriteString("\n╔════════════════════════════════════════════════════════════╗\n")
+	s.WriteString("║             APK DEEP ANALYSIS REPORT                       ║\n")
+	s.WriteString("╚════════════════════════════════════════════════════════════╝\n")
 
-	fmt.Printf("\n📦 Package Information:\n")
-	fmt.Printf("   Package Name:  %s\n", analysis.PackageName)
-	fmt.Printf("   Version:       %s (%s)\n", analysis.VersionName, analysis.VersionCode)
-	fmt.Printf("   Min SDK:       %s\n", analysis.MinSDK)
-	fmt.Printf("   Target SDK:    %s\n", analysis.TargetSDK)
+	s.WriteString(fmt.Sprintf("\n📦 Package Information:\n"))
+	s.WriteString(fmt.Sprintf("   Package Name:  %s\n", analysis.PackageName))
+	s.WriteString(fmt.Sprintf("   Version:       %s (%s)\n", analysis.VersionName, analysis.VersionCode))
+	s.WriteString(fmt.Sprintf("   Min SDK:       %s\n", analysis.MinSDK))
+	s.WriteString(fmt.Sprintf("   Target SDK:    %s\n", analysis.TargetSDK))
 
-	fmt.Printf("\n🔐 Permissions (%d):\n", len(analysis.Permissions))
+	s.WriteString(fmt.Sprintf("\n🔐 Permissions (%d):\n", len(analysis.Permissions)))
 	for _, perm := range analysis.Permissions {
 		// Highlight dangerous permissions
 		isDangerous := strings.Contains(perm.Name, "CAMERA") ||
@@ -217,52 +219,52 @@ func PrintAnalysis(analysis *APKAnalysis) {
 			strings.Contains(perm.Name, "MICROPHONE")
 		
 		if isDangerous {
-			fmt.Printf("   ⚠️  %s\n", perm.Name)
+			s.WriteString(fmt.Sprintf("   ⚠️  %s\n", perm.Name))
 		} else {
-			fmt.Printf("   •  %s\n", perm.Name)
+			s.WriteString(fmt.Sprintf("   •  %s\n", perm.Name))
 		}
 	}
 
-	fmt.Printf("\n📱 Activities (%d):\n", len(analysis.Activities))
+	s.WriteString(fmt.Sprintf("\n📱 Activities (%d):\n", len(analysis.Activities)))
 	for _, act := range analysis.Activities {
 		if act.Exported {
-			fmt.Printf("   🔓 [EXPORTED] %s\n", act.Name)
+			s.WriteString(fmt.Sprintf("   🔓 [EXPORTED] %s\n", act.Name))
 		} else {
-			fmt.Printf("   •  %s\n", act.Name)
+			s.WriteString(fmt.Sprintf("   •  %s\n", act.Name))
 		}
 	}
 
-	fmt.Printf("\n⚙️  Services (%d):\n", len(analysis.Services))
+	s.WriteString(fmt.Sprintf("\n⚙️  Services (%d):\n", len(analysis.Services)))
 	for _, svc := range analysis.Services {
 		if svc.Exported {
-			fmt.Printf("   🔓 [EXPORTED] %s\n", svc.Name)
+			s.WriteString(fmt.Sprintf("   🔓 [EXPORTED] %s\n", svc.Name))
 		} else {
-			fmt.Printf("   •  %s\n", svc.Name)
+			s.WriteString(fmt.Sprintf("   •  %s\n", svc.Name))
 		}
 	}
 
-	fmt.Printf("\n📡 Broadcast Receivers (%d):\n", len(analysis.Receivers))
+	s.WriteString(fmt.Sprintf("\n📡 Broadcast Receivers (%d):\n", len(analysis.Receivers)))
 	for _, rcv := range analysis.Receivers {
 		if rcv.Exported {
-			fmt.Printf("   🔓 [EXPORTED] %s\n", rcv.Name)
+			s.WriteString(fmt.Sprintf("   🔓 [EXPORTED] %s\n", rcv.Name))
 		} else {
-			fmt.Printf("   •  %s\n", rcv.Name)
+			s.WriteString(fmt.Sprintf("   •  %s\n", rcv.Name))
 		}
 	}
 
 	if len(analysis.Providers) > 0 {
-		fmt.Printf("\n🗄️  Content Providers (%d):\n", len(analysis.Providers))
+		s.WriteString(fmt.Sprintf("\n🗄️  Content Providers (%d):\n", len(analysis.Providers)))
 		for _, prov := range analysis.Providers {
 			if prov.Exported {
-				fmt.Printf("   🔓 [EXPORTED] %s\n", prov.Name)
+				s.WriteString(fmt.Sprintf("   🔓 [EXPORTED] %s\n", prov.Name))
 			} else {
-				fmt.Printf("   •  %s\n", prov.Name)
+				s.WriteString(fmt.Sprintf("   •  %s\n", prov.Name))
 			}
 		}
 	}
 
 	// Security warnings
-	fmt.Println("\n⚠️  Security Considerations:")
+	s.WriteString("\n⚠️  Security Considerations:\n")
 	exportedCount := 0
 	for _, act := range analysis.Activities {
 		if act.Exported {
@@ -281,11 +283,14 @@ func PrintAnalysis(analysis *APKAnalysis) {
 	}
 
 	if exportedCount > 0 {
-		fmt.Printf("   • %d exported components (potential attack surface)\n", exportedCount)
+		s.WriteString(fmt.Sprintf("   • %d exported components (potential attack surface)\n", exportedCount))
 	}
 	if len(analysis.Permissions) > 10 {
-		fmt.Printf("   • High number of permissions requested (%d)\n", len(analysis.Permissions))
+		s.WriteString(fmt.Sprintf("   • High number of permissions requested (%d)\n", len(analysis.Permissions)))
 	}
 
-	fmt.Println("\n" + strings.Repeat("─", 60))
+	s.WriteString("\n" + strings.Repeat("─", 60) + "\n")
+	
+	return s.String()
 }
+

@@ -13,98 +13,102 @@ type NetworkCaptureGuide struct {
 	ProxyPort string
 }
 
-// DisplayNetworkCaptureInstructions shows setup guide for MITM proxy
-func DisplayNetworkCaptureInstructions(guide NetworkCaptureGuide) {
-	fmt.Println("\n╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║      MOBILE NETWORK TRAFFIC CAPTURE SETUP GUIDE            ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+// FormatNetworkCaptureInstructions returns the setup guide as a formatted string
+func FormatNetworkCaptureInstructions(guide NetworkCaptureGuide) string {
+	var s strings.Builder
 
-	fmt.Println("\n📱 Step 1: Setup Proxy Tool")
-	fmt.Println(strings.Repeat("─", 60))
+	s.WriteString("\n╔════════════════════════════════════════════════════════════╗\n")
+	s.WriteString("║      MOBILE NETWORK TRAFFIC CAPTURE SETUP GUIDE            ║\n")
+	s.WriteString("╚════════════════════════════════════════════════════════════╝\n")
+
+	s.WriteString("\n📱 Step 1: Setup Proxy Tool\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
 	
 	if guide.ProxyType == "mitmproxy" {
-		fmt.Println("Using mitmproxy:")
-		fmt.Println("  1. Install: pip install mitmproxy")
-		fmt.Println("  2. Start proxy: mitmproxy -p 8080")
-		fmt.Println("  3. Or web interface: mitmweb -p 8080")
+		s.WriteString("Using mitmproxy:\n")
+		s.WriteString("  1. Install: pip install mitmproxy\n")
+		s.WriteString("  2. Start proxy: mitmproxy -p 8080\n")
+		s.WriteString("  3. Or web interface: mitmweb -p 8080\n")
 	} else {
-		fmt.Println("Using Burp Suite:")
-		fmt.Println("  1. Open Burp Suite")
-		fmt.Println("  2. Go to Proxy → Options")
-		fmt.Println("  3. Ensure proxy listener is on 0.0.0.0:8080")
-		fmt.Println("  4. Enable invisible proxying (optional)")
+		s.WriteString("Using Burp Suite:\n")
+		s.WriteString("  1. Open Burp Suite\n")
+		s.WriteString("  2. Go to Proxy → Options\n")
+		s.WriteString("  3. Ensure proxy listener is on 0.0.0.0:8080\n")
+		s.WriteString("  4. Enable invisible proxying (optional)\n")
 	}
 
-	fmt.Println("\n🔧 Step 2: Configure Android Device Proxy")
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Printf("Manual Configuration:\n")
-	fmt.Println("  1. Settings → Wi-Fi → Long press network → Modify")
-	fmt.Println("  2. Advanced options → Proxy: Manual")
-	fmt.Printf("  3. Proxy hostname: %s\n", guide.ProxyIP)
-	fmt.Printf("  4. Proxy port: %s\n", guide.ProxyPort)
-	fmt.Println("  5. Save")
+	s.WriteString("\n🔧 Step 2: Configure Android Device Proxy\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
+	s.WriteString("Manual Configuration:\n")
+	s.WriteString("  1. Settings → Wi-Fi → Long press network → Modify\n")
+	s.WriteString("  2. Advanced options → Proxy: Manual\n")
+	s.WriteString(fmt.Sprintf("  3. Proxy hostname: %s\n", guide.ProxyIP))
+	s.WriteString(fmt.Sprintf("  4. Proxy port: %s\n", guide.ProxyPort))
+	s.WriteString("  5. Save\n")
 
-	fmt.Println("\nADB Configuration (Alternative):")
+	s.WriteString("\nADB Configuration (Alternative):\n")
 	devices, _ := GetConnectedDevices()
 	if len(devices) > 0 {
-		fmt.Printf("  Device detected: %s\n", devices[0])
-		fmt.Printf("  Run: adb shell settings put global http_proxy %s:%s\n", 
-			guide.ProxyIP, guide.ProxyPort)
-		fmt.Println("  To remove: adb shell settings put global http_proxy :0")
+		s.WriteString(fmt.Sprintf("  Device detected: %s\n", devices[0]))
+		s.WriteString(fmt.Sprintf("  Run: adb shell settings put global http_proxy %s:%s\n", 
+			guide.ProxyIP, guide.ProxyPort))
+		s.WriteString("  To remove: adb shell settings put global http_proxy :0\n")
 	} else {
-		fmt.Println("  ⚠️  No ADB device detected. Connect device and enable USB debugging.")
+		s.WriteString("  ⚠️  No ADB device detected. Connect device and enable USB debugging.\n")
 	}
 
-	fmt.Println("\n🔐 Step 3: Install CA Certificate")
-	fmt.Println(strings.Repeat("─", 60))
+	s.WriteString("\n🔐 Step 3: Install CA Certificate\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
 	
 	if guide.ProxyType == "mitmproxy" {
-		fmt.Println("  1. On Android, open browser to: http://mitm.it")
-		fmt.Println("  2. Download Android certificate")
-		fmt.Println("  3. Settings → Security → Install from storage")
-		fmt.Println("  4. Select downloaded certificate")
-		fmt.Println("  5. Name it 'mitmproxy' and select VPN and apps")
+		s.WriteString("  1. On Android, open browser to: http://mitm.it\n")
+		s.WriteString("  2. Download Android certificate\n")
+		s.WriteString("  3. Settings → Security → Install from storage\n")
+		s.WriteString("  4. Select downloaded certificate\n")
+		s.WriteString("  5. Name it 'mitmproxy' and select VPN and apps\n")
 	} else {
-		fmt.Println("  1. Export Burp CA cert: Proxy → Options → Import/Export CA cert")
-		fmt.Println("  2. Save as DER format")
-		fmt.Println("  3. Push to device: adb push burp-cert.der /sdcard/")
-		fmt.Println("  4. Settings → Security → Install from storage")
-		fmt.Println("  5. Select burp-cert.der, name it 'Burp Suite'")
+		s.WriteString("  1. Export Burp CA cert: Proxy → Options → Import/Export CA cert\n")
+		s.WriteString("  2. Save as DER format\n")
+		s.WriteString("  3. Push to device: adb push burp-cert.der /sdcard/\n")
+		s.WriteString("  4. Settings → Security → Install from storage\n")
+		s.WriteString("  5. Select burp-cert.der, name it 'Burp Suite'\n")
 	}
 
-	fmt.Println("\n⚠️  For Android 7+ (Nougat and above):")
-	fmt.Println("  Apps ignore user certificates by default.")
-	fmt.Println("  Solutions:")
-	fmt.Println("    • Modify APK network security config (see APK Injector)")
-	fmt.Println("    • Use rooted device to install as system cert")
-	fmt.Println("    • Add to /system/etc/security/cacerts/")
+	s.WriteString("\n⚠️  For Android 7+ (Nougat and above):\n")
+	s.WriteString("  Apps ignore user certificates by default.\n")
+	s.WriteString("  Solutions:\n")
+	s.WriteString("    • Modify APK network security config (see APK Injector)\n")
+	s.WriteString("    • Use rooted device to install as system cert\n")
+	s.WriteString("    • Add to /system/etc/security/cacerts/\n")
 
-	fmt.Println("\n🔍 Step 4: Test Traffic Capture")
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Println("  1. Open app on device")
-	fmt.Println("  2. Check proxy tool for intercepted traffic")
-	fmt.Println("  3. If HTTPS fails, app may use SSL pinning")
+	s.WriteString("\n🔍 Step 4: Test Traffic Capture\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
+	s.WriteString("  1. Open app on device\n")
+	s.WriteString("  2. Check proxy tool for intercepted traffic\n")
+	s.WriteString("  3. If HTTPS fails, app may use SSL pinning\n")
 
-	fmt.Println("\n🛡️  SSL Pinning Detection:")
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Println("  If app refuses HTTPS connections after proxy setup:")
-	fmt.Println("    • App likely uses certificate pinning")
-	fmt.Println("    • Bypass options:")
-	fmt.Println("      - Frida with SSL pinning bypass script")
-	fmt.Println("      - Objection: objection --gadget <package> explore")
-	fmt.Println("      - Xposed modules (rooted device)")
-	fmt.Println("      - Patch APK to disable pinning")
+	s.WriteString("\n🛡️  SSL Pinning Detection:\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
+	s.WriteString("  If app refuses HTTPS connections after proxy setup:\n")
+	s.WriteString("    • App likely uses certificate pinning\n")
+	s.WriteString("    • Bypass options:\n")
+	s.WriteString("      - Frida with SSL pinning bypass script\n")
+	s.WriteString("      - Objection: objection --gadget <package> explore\n")
+	s.WriteString("      - Xposed modules (rooted device)\n")
+	s.WriteString("      - Patch APK to disable pinning\n")
 
-	fmt.Println("\n💡 Useful ADB Commands:")
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Println("  • List packages: adb shell pm list packages")
-	fmt.Println("  • Get app path: adb shell pm path <package>")
-	fmt.Println("  • Pull APK: adb pull /data/app/<package>/base.apk")
-	fmt.Println("  • Check proxy: adb shell settings get global http_proxy")
+	s.WriteString("\n💡 Useful ADB Commands:\n")
+	s.WriteString(strings.Repeat("─", 60) + "\n")
+	s.WriteString("  • List packages: adb shell pm list packages\n")
+	s.WriteString("  • Get app path: adb shell pm path <package>\n")
+	s.WriteString("  • Pull APK: adb pull /data/app/<package>/base.apk\n")
+	s.WriteString("  • Check proxy: adb shell settings get global http_proxy\n")
 	
-	fmt.Println("\n" + strings.Repeat("─", 60))
-	fmt.Println("✓ Network capture setup guide complete!")
-	fmt.Println("  For more help, refer to OWASP Mobile Security Testing Guide")
+	s.WriteString("\n" + strings.Repeat("─", 60) + "\n")
+	s.WriteString("✓ Network capture setup guide complete!\n")
+	s.WriteString("  For more help, refer to OWASP Mobile Security Testing Guide\n")
+	
+	return s.String()
 }
 
 // SetupADBProxy configures Android device to use proxy via ADB
