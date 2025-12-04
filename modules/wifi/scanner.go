@@ -1,9 +1,7 @@
 package wifi
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -36,34 +34,4 @@ func ChannelHopSingle(iface string, ch int) error {
 	return exec.Command("bash", "-c", fmt.Sprintf("iwconfig %s channel %d", iface, ch)).Run()
 }
 
-// ScanAndPrintAll scans all provided interfaces and prints found SSIDs.
-func ScanAndPrintAll(ifaces []string) {
-	if len(ifaces) == 0 {
-		fmt.Println("No wireless interfaces found.")
-		return
-	}
-	for _, iface := range ifaces {
-		fmt.Printf("\n--- Interface: %s ---\n", iface)
-		ssids, err := ScanNetworks(iface)
-		if err != nil {
-			fmt.Println("Scan error:", err)
-			continue
-		}
-		if len(ssids) == 0 {
-			fmt.Println("No SSIDs found.")
-			continue
-		}
-		fmt.Println("Found SSIDs:")
-		for _, s := range ssids {
-			fmt.Println("-", s)
-		}
-	}
-}
 
-// Prompt returns trimmed input from stdin after showing prompt text.
-func Prompt(promptText string) string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(promptText)
-	text, _ := reader.ReadString('\n')
-	return strings.TrimSpace(text)
-}

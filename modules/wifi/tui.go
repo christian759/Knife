@@ -5,10 +5,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -650,6 +650,7 @@ type sniffFinishedMsg struct{}
 
 type snifferModel struct {
 	list      list.Model
+	spinner   spinner.Model
 	sub       chan string
 	listening bool
 	err       error
@@ -676,6 +677,10 @@ func initialSnifferModel(iface string, timeout time.Duration) snifferModel {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	sub := make(chan string)
 	
 	// Start sniffer in goroutine
@@ -686,13 +691,14 @@ func initialSnifferModel(iface string, timeout time.Duration) snifferModel {
 
 	return snifferModel{
 		list:      l,
+		spinner:   s,
 		sub:       sub,
 		listening: true,
 	}
 }
 
 func (m snifferModel) Init() tea.Cmd {
-	return tea.Batch(list.NewSpinner().Tick, waitForPacket(m.sub))
+	return tea.Batch(m.spinner.Tick, waitForPacket(m.sub))
 }
 
 func (m snifferModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -714,11 +720,28 @@ func (m snifferModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	if m.listening {
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	cmds = append(cmds, cmd)
+	
+	return m, tea.Batch(cmds...)
 }
 
 func (m snifferModel) View() string {
+	if m.listening {
+		// Show spinner in title or status bar?
+		// For now, let's just append it to the title if possible, or just rely on the list updating
+		// Actually, let's just show the list, as it updates in real-time.
+		// The spinner might be distracting if the list is moving.
+		// But let's keep the spinner update logic just in case we want to show it.
+		return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+	}
 	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 }
 
@@ -769,6 +792,7 @@ func (i scanItem) FilterValue() string { return i.ssid }
 
 type scanModel struct {
 	list     list.Model
+	spinner  spinner.Model
 	scanning bool
 	err      error
 }
@@ -784,7 +808,6 @@ func scanNetworksCmd() tea.Cmd {
 		}
 		
 		// Scan on first interface for now
-		// In a full implementation we might want to scan on all or let user choose
 		ssids, err := ScanNetworks(ifaces[0])
 		if err != nil {
 			return scanErrorMsg(err)
@@ -804,14 +827,19 @@ func initialScanModel() scanModel {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	return scanModel{
 		list:     l,
+		spinner:  s,
 		scanning: true,
 	}
 }
 
 func (m scanModel) Init() tea.Cmd {
-	return tea.Batch(list.NewSpinner().Tick, scanNetworksCmd())
+	return tea.Batch(m.spinner.Tick, scanNetworksCmd())
 }
 
 func (m scanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -840,14 +868,29 @@ func (m scanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	if m.scanning {
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	cmds = append(cmds, cmd)
+	
+	return m, tea.Batch(cmds...)
 }
 
 func (m scanModel) View() string {
 	if m.err != nil {
 		return lipgloss.NewStyle().Margin(1, 2).Render(tui.RenderError(m.err.Error()) + "\n\nPress q to quit")
 	}
+	
+	if m.scanning {
+		return lipgloss.NewStyle().Margin(1, 2).Render(
+			fmt.Sprintf("\n %s Scanning for networks...\n\n%s", m.spinner.View(), tui.RenderInfo("Please wait...")))
+	}
+
 	return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 }
 
