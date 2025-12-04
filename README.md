@@ -289,16 +289,6 @@ knife/
 - ✅ **Responsive Layouts**: Automatic adaptation to terminal size
 - ✅ **Lipgloss Styling**: Beautiful, consistent visual design
 
-## 🎯 Roadmap
-
-- [ ] Add tests for all modules
-- [ ] Bluetooth attack module
-- [ ] Network scanning module (Nmap integration)
-- [ ] Password cracking module
-- [ ] Metasploit integration
-- [ ] Report export (PDF, JSON)
-- [ ] Configuration file support
-- [ ] Plugin system for custom modules
 
 ## ⚠️ Legal Disclaimer
 
