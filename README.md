@@ -10,10 +10,19 @@ A modern, terminal-based penetration testing toolkit built with Go and [Bubble T
 
 ## ✨ Features
 
-### 📱 Mobile Attack
-- **APK Injector**: Inject payloads into Android APK files with interactive file picker
-- **APK Reconnaissance**: Analyze APK metadata, permissions, and structure
-- **Process Monitor**: Monitor Android device processes via ADB
+### 📱 Mobile Pentesting
+- **8 Comprehensive Tools**: Complete mobile and app penetration testing suite
+  - **APK Injector**: Inject payloads into Android APK files with interactive file picker
+  - **APK Deep Analysis**: Extract detailed information (permissions, components, exported activities, services, receivers)
+  - **APK Reconnaissance**: Basic APK metadata analysis with aapt
+  - **Process Monitor**: Real-time Android device process monitoring via ADB
+  - **Logcat Monitor**: Real-time Android log analysis with filtering by level and package
+  - **Network Capture**: MITM proxy setup guide (mitmproxy/Burp Suite) with SSL pinning detection
+  - **Backup Extractor**: Create and analyze Android backups, extract databases and shared preferences
+  - **Security Scanner**: Automated security vulnerability detection (debuggable, cleartext traffic, exported components)
+- **Static Analysis**: Component enumeration, permission analysis, security issue detection
+- **Dynamic Analysis**: Live log monitoring, network traffic interception, backup inspection
+- **Security Testing**: Automated scanning for common misconfigurations and vulnerabilities
 
 ### 🎣 Phishing
 - **Dual Phishing Modes**: 

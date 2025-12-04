@@ -17,9 +17,14 @@ import (
 type mobileAction string
 
 const (
-	actionInjector mobileAction = "Injector"
-	actionRecon    mobileAction = "Recon"
-	actionMonitor  mobileAction = "Monitor"
+	actionInjector       mobileAction = "Injector"
+	actionDeepAnalysis   mobileAction = "APK Deep Analysis"
+	actionRecon          mobileAction = "Recon"
+	actionMonitor        mobileAction = "Monitor"
+	actionLogcat         mobileAction = "Logcat Monitor"
+	actionNetworkCapture mobileAction = "Network Capture"
+	actionBackup         mobileAction = "Backup Extractor"
+	actionSecurityScan   mobileAction = "Security Scanner"
 )
 
 type actionItem struct {
@@ -310,12 +315,32 @@ func RunMobileModule() {
 			description: "Inject payload into APK (requires uber-apk-signer)",
 		},
 		actionItem{
+			title:       string(actionDeepAnalysis),
+			description: "Deep APK analysis: components, permissions, security issues",
+		},
+		actionItem{
 			title:       string(actionRecon),
-			description: "Analyze APK metadata and structure",
+			description: "Basic APK metadata analysis (aapt badging)",
 		},
 		actionItem{
 			title:       string(actionMonitor),
 			description: "Monitor Android device processes (requires ADB)",
+		},
+		actionItem{
+			title:       string(actionLogcat),
+			description: "Real-time Android log monitoring with filtering (requires ADB)",
+		},
+		actionItem{
+			title:       string(actionNetworkCapture),
+			description: "Setup guide for mobile traffic interception (MITM proxy)",
+		},
+		actionItem{
+			title:       string(actionBackup),
+			description: "Create and analyze Android app backups (requires ADB)",
+		},
+		actionItem{
+			title:       string(actionSecurityScan),
+			description: "Automated security vulnerability scanner",
 		},
 	}
 
@@ -324,7 +349,7 @@ func RunMobileModule() {
 	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
 
 	l := list.New(items, delegate, 0, 0)
-	l.Title = "🤖 Mobile Attack Tools"
+	l.Title = "🤖 Mobile Pentesting Tools"
 	l.Styles.Title = tui.TitleStyle
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
@@ -342,10 +367,20 @@ func RunMobileModule() {
 		switch m.chosen {
 		case string(actionInjector):
 			runInjector()
+		case string(actionDeepAnalysis):
+			runDeepAnalysis()
 		case string(actionRecon):
 			runRecon()
 		case string(actionMonitor):
 			Monitor()
+		case string(actionLogcat):
+			runLogcat()
+		case string(actionNetworkCapture):
+			runNetworkCapture()
+		case string(actionBackup):
+			runBackup()
+		case string(actionSecurityScan):
+			runSecurityScan()
 		}
 	}
 }
@@ -387,3 +422,226 @@ func runRecon() {
 		ParseAPKMeat(m.apkPath)
 	}
 }
+
+func runDeepAnalysis() {
+	p := tea.NewProgram(initialReconModel())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
+
+	if m, ok := finalModel.(reconModel); ok && m.submitted {
+		fmt.Println()
+		fmt.Println(tui.RenderInfo("Performing deep APK analysis..."))
+		fmt.Println()
+		
+		analysis, err := DeepAnalyzeAPK(m.apkPath)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Analysis failed: %v", err)))
+			return
+		}
+		
+		PrintAnalysis(analysis)
+	}
+}
+
+func runLogcat() {
+	// Create simple text input for configuration
+	ti := textinput.New()
+	ti.Placeholder = "Package filter (optional, press Enter to skip)"
+	ti.Focus()
+	ti.CharLimit = 256
+	ti.Width = 50
+
+	fmt.Println(tui.RenderTitle("Logcat Monitor"))
+	fmt.Println()
+	fmt.Println(tui.RenderSubtitle("Configuration"))
+	fmt.Println()
+	
+	// Check for connected devices
+	devices, err := GetConnectedDevices()
+	if err != nil || len(devices) == 0 {
+		fmt.Println(tui.RenderError("No Android devices connected via ADB"))
+		fmt.Println(tui.RenderInfo("Connect device and enable USB debugging, then try again"))
+		return
+	}
+	
+	fmt.Printf("Device detected: %s\n\n", devices[0])
+	
+	// Get package filter
+	fmt.Print("Package filter (optional): ")
+	var packageFilter string
+	fmt.Scanln(&packageFilter)
+	
+	// Get log level
+	fmt.Println("\nSelect log level:")
+	fmt.Println("  V - Verbose")
+	fmt.Println("  D - Debug")
+	fmt.Println("  I - Info (default)")
+	fmt.Println("  W - Warning")
+	fmt.Println("  E - Error")
+	fmt.Print("Level [I]: ")
+	var levelInput string
+	fmt.Scanln(&levelInput)
+	
+	level := LogInfo
+	if levelInput != "" {
+		switch strings.ToUpper(levelInput) {
+		case "V":
+			level = LogVerbose
+		case "D":
+			level = LogDebug
+		case "W":
+			level = LogWarn
+		case "E":
+			level = LogError
+		case "F":
+			level = LogFatal
+		}
+	}
+	
+	config := LogcatConfig{
+		Level:         level,
+		PackageFilter: packageFilter,
+		ClearFirst:    true,
+	}
+	
+	MonitorLogcat(config)
+}
+
+func runNetworkCapture() {
+	fmt.Println(tui.RenderTitle("Mobile Network Traffic Capture"))
+	fmt.Println()
+	
+	fmt.Println("Select proxy tool:")
+	fmt.Println("  1. mitmproxy")
+	fmt.Println("  2. Burp Suite")
+	fmt.Print("Choice [1]: ")
+	
+	var choice string
+	fmt.Scanln(&choice)
+	
+	proxyType := "mitmproxy"
+	if choice == "2" {
+		proxyType = "burp"
+	}
+	
+	fmt.Print("\nEnter your computer's IP address [192.168.1.100]: ")
+	var proxyIP string
+	fmt.Scanln(&proxyIP)
+	if proxyIP == "" {
+		proxyIP = "192.168.1.100"
+	}
+	
+	fmt.Print("Enter proxy port [8080]: ")
+	var proxyPort string
+	fmt.Scanln(&proxyPort)
+	if proxyPort == "" {
+		proxyPort = "8080"
+	}
+	
+	guide := NetworkCaptureGuide{
+		ProxyType: proxyType,
+		ProxyIP:   proxyIP,
+		ProxyPort: proxyPort,
+	}
+	
+	DisplayNetworkCaptureInstructions(guide)
+	
+	fmt.Println("\nWould you like to configure proxy via ADB? (y/n): ")
+	var configure string
+	fmt.Scanln(&configure)
+	
+	if strings.ToLower(configure) == "y" {
+		if err := SetupADBProxy(proxyIP, proxyPort); err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Failed to set proxy: %v", err)))
+		}
+	}
+}
+
+func runBackup() {
+	fmt.Println(tui.RenderTitle("Android Backup Extractor"))
+	fmt.Println()
+	
+	// Check for connected devices
+	devices, err := GetConnectedDevices()
+	if err != nil || len(devices) == 0 {
+		fmt.Println(tui.RenderError("No Android devices connected via ADB"))
+		return
+	}
+	
+	fmt.Printf("Device: %s\n\n", devices[0])
+	
+	fmt.Print("Enter package name (e.g., com.example.app): ")
+	var packageName string
+	fmt.Scanln(&packageName)
+	
+	if packageName == "" {
+		fmt.Println(tui.RenderError("Package name is required"))
+		return
+	}
+	
+	outputPath := packageName + "_backup.ab"
+	
+	config := BackupConfig{
+		PackageName: packageName,
+		OutputPath:  outputPath,
+		IncludeAPK:  true,
+		IncludeOBB:  false,
+		AllData:     false,
+	}
+	
+	if err := CreateBackup(config); err != nil {
+		fmt.Println(tui.RenderError(fmt.Sprintf("Backup failed: %v", err)))
+		return
+	}
+	
+	// Extract backup
+	fmt.Println("\nExtract backup? (y/n): ")
+	var extract string
+	fmt.Scanln(&extract)
+	
+	if strings.ToLower(extract) == "y" {
+		tarFile, err := ExtractBackup(outputPath)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Extraction failed: %v", err)))
+			return
+		}
+		
+		// List contents
+		if err := ListBackupContents(tarFile); err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Failed to list contents: %v", err)))
+			return
+		}
+		
+		// Security analysis
+		if err := AnalyzeBackupSecurity(tarFile); err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Security analysis failed: %v", err)))
+		}
+	}
+}
+
+func runSecurityScan() {
+	p := tea.NewProgram(initialReconModel())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
+
+	if m, ok := finalModel.(reconModel); ok && m.submitted {
+		fmt.Println()
+		fmt.Println(tui.RenderInfo("Scanning APK for security issues..."))
+		fmt.Println()
+		
+		result, err := ScanAPKSecurity(m.apkPath)
+		if err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Security scan failed: %v", err)))
+			return
+		}
+		
+		PrintSecurityReport(result)
+	}
+}
+
