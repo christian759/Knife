@@ -307,6 +307,355 @@ func (m reconModel) View() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
 }
 
+// ========== Logcat Configuration Model ==========
+
+type logcatConfigModel struct {
+	packageInput  textinput.Model
+	levelList     list.Model
+	focusedField  int
+	submitted     bool
+	config        LogcatConfig
+}
+
+func initialLogcatConfigModel() logcatConfigModel {
+	// Package filter input
+	pkgInput := textinput.New()
+	pkgInput.Placeholder = "com.example.app (optional)"
+	pkgInput.CharLimit = 256
+	pkgInput.Width = 50
+
+	// Log level selection
+	levels := []list.Item{
+		actionItem{title: "Info", description: "Info level (default)"},
+		actionItem{title: "Verbose", description: "All logs including verbose"},
+		actionItem{title: "Debug", description: "Debug and above"},
+		actionItem{title: "Warning", description: "Warnings and errors only"},
+		actionItem{title: "Error", description: "Errors only"},
+	}
+
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = tui.SelectedItemStyle
+	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
+
+	levelList := list.New(levels, delegate, 0, 10)
+	levelList.Title = "Log Level"
+	levelList.Styles.Title = tui.TitleStyle
+	levelList.SetShowStatusBar(false)
+	levelList.SetFilteringEnabled(false)
+
+	m := logcatConfigModel{
+		packageInput: pkgInput,
+		levelList:    levelList,
+		focusedField: 0,
+	}
+
+	m.packageInput.Focus()
+	return m
+}
+
+func (m logcatConfigModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m logcatConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "tab", "shift+tab":
+			if m.focusedField == 0 {
+				m.focusedField = 1
+				m.packageInput.Blur()
+			} else {
+				m.focusedField = 0
+				m.packageInput.Focus()
+			}
+			return m, nil
+		case "enter":
+			if m.focusedField == 1 {
+				// Submit
+				levelMap := map[string]LogLevel{
+					"Info":    LogInfo,
+					"Verbose": LogVerbose,
+					"Debug":   LogDebug,
+					"Warning": LogWarn,
+					"Error":   LogError,
+				}
+
+				selectedLevel := LogInfo
+				if i, ok := m.levelList.SelectedItem().(actionItem); ok {
+					if level, exists := levelMap[i.title]; exists {
+						selectedLevel = level
+					}
+				}
+
+				m.config = LogcatConfig{
+					Level:         selectedLevel,
+					PackageFilter: m.packageInput.Value(),
+					ClearFirst:    true,
+				}
+				m.submitted = true
+				return m, tea.Quit
+			}
+		}
+	case tea.WindowSizeMsg:
+		h, _ := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.levelList.SetSize(msg.Width-h, 10)
+	}
+
+	var cmd tea.Cmd
+	if m.focusedField == 0 {
+		m.packageInput, cmd = m.packageInput.Update(msg)
+	} else {
+		m.levelList, cmd = m.levelList.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m logcatConfigModel) View() string {
+	var s strings.Builder
+	s.WriteString(tui.RenderTitle("Logcat Monitor Configuration"))
+	s.WriteString("\n\n")
+
+	// Package filter
+	s.WriteString(tui.InputLabelStyle.Render("Package Filter: "))
+	s.WriteString(m.packageInput.View())
+	s.WriteString("\n\n")
+
+	// Log level
+	if m.focusedField == 1 {
+		s.WriteString(m.levelList.View())
+	} else {
+		s.WriteString(tui.RenderSubtitle("Log Level: " + m.levelList.SelectedItem().(actionItem).title))
+	}
+
+	s.WriteString("\n\n")
+	s.WriteString(tui.RenderHelp("tab: next field • enter: start monitoring • q/esc: cancel"))
+
+	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
+}
+
+// ========== Network Capture Configuration Model ==========
+
+type networkCaptureModel struct {
+	proxyTypeList  list.Model
+	proxyIPInput   textinput.Model
+	proxyPortInput textinput.Model
+	focusedField   int
+	submitted      bool
+	guide          NetworkCaptureGuide
+}
+
+func initialNetworkCaptureModel() networkCaptureModel {
+	// Proxy type selection
+	proxyTypes := []list.Item{
+		actionItem{title: "mitmproxy", description: "Free open-source MITM proxy"},
+		actionItem{title: "burp", description: "Burp Suite Professional"},
+	}
+
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = tui.SelectedItemStyle
+	delegate.Styles.SelectedDesc = tui.SelectedItemStyle.Copy().Foreground(tui.SubtleColor)
+
+	proxyList := list.New(proxyTypes, delegate, 0, 8)
+	proxyList.Title = "Proxy Tool"
+	proxyList.Styles.Title = tui.TitleStyle
+	proxyList.SetShowStatusBar(false)
+	proxyList.SetFilteringEnabled(false)
+
+	// Proxy IP input
+	ipInput := textinput.New()
+	ipInput.Placeholder = "192.168.1.100"
+	ipInput.CharLimit = 15
+	ipInput.Width = 30
+
+	// Proxy port input
+	portInput := textinput.New()
+	portInput.Placeholder = "8080"
+	portInput.CharLimit = 5
+	portInput.Width = 10
+
+	m := networkCaptureModel{
+		proxyTypeList:  proxyList,
+		proxyIPInput:   ipInput,
+		proxyPortInput: portInput,
+		focusedField:   0,
+	}
+
+	return m
+}
+
+func (m networkCaptureModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m networkCaptureModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "tab":
+			m.focusedField = (m.focusedField + 1) % 3
+			m.updateFocus()
+			return m, nil
+		case "shift+tab":
+			m.focusedField = (m.focusedField - 1 + 3) % 3
+			m.updateFocus()
+			return m, nil
+		case "enter":
+			if m.focusedField == 2 {
+				// Submit
+				proxyType := "mitmproxy"
+				if i, ok := m.proxyTypeList.SelectedItem().(actionItem); ok {
+					proxyType = i.title
+				}
+
+				proxyIP := m.proxyIPInput.Value()
+				if proxyIP == "" {
+					proxyIP = "192.168.1.100"
+				}
+
+				proxyPort := m.proxyPortInput.Value()
+				if proxyPort == "" {
+					proxyPort = "8080"
+				}
+
+				m.guide = NetworkCaptureGuide{
+					ProxyType: proxyType,
+					ProxyIP:   proxyIP,
+					ProxyPort: proxyPort,
+				}
+				m.submitted = true
+				return m, tea.Quit
+			} else {
+				m.focusedField = (m.focusedField + 1) % 3
+				m.updateFocus()
+				return m, nil
+			}
+		}
+	case tea.WindowSizeMsg:
+		h, _ := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.proxyTypeList.SetSize(msg.Width-h, 8)
+	}
+
+	var cmd tea.Cmd
+	switch m.focusedField {
+	case 0:
+		m.proxyTypeList, cmd = m.proxyTypeList.Update(msg)
+	case 1:
+		m.proxyIPInput, cmd = m.proxyIPInput.Update(msg)
+	case 2:
+		m.proxyPortInput, cmd = m.proxyPortInput.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m *networkCaptureModel) updateFocus() {
+	m.proxyIPInput.Blur()
+	m.proxyPortInput.Blur()
+
+	switch m.focusedField {
+	case 1:
+		m.proxyIPInput.Focus()
+	case 2:
+		m.proxyPortInput.Focus()
+	}
+}
+
+func (m networkCaptureModel) View() string {
+	var s strings.Builder
+	s.WriteString(tui.RenderTitle("Network Capture Configuration"))
+	s.WriteString("\n\n")
+
+	// Proxy type
+	if m.focusedField == 0 {
+		s.WriteString(m.proxyTypeList.View())
+	} else {
+		selectedProxy := "mitmproxy"
+		if i, ok := m.proxyTypeList.SelectedItem().(actionItem); ok {
+			selectedProxy = i.title
+		}
+		s.WriteString(tui.RenderSubtitle("Proxy Tool: " + selectedProxy))
+	}
+	s.WriteString("\n\n")
+
+	// Proxy IP
+	s.WriteString(tui.InputLabelStyle.Render("Proxy IP: "))
+	s.WriteString(m.proxyIPInput.View())
+	s.WriteString("\n\n")
+
+	// Proxy port
+	s.WriteString(tui.InputLabelStyle.Render("Proxy Port: "))
+	s.WriteString(m.proxyPortInput.View())
+	s.WriteString("\n\n")
+
+	s.WriteString(tui.RenderHelp("tab: next field • enter: continue • q/esc: cancel"))
+
+	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
+}
+
+// ========== Backup Configuration Model ==========
+
+type backupConfigModel struct {
+	packageInput textinput.Model
+	submitted    bool
+	packageName  string
+}
+
+func initialBackupConfigModel() backupConfigModel {
+	pkgInput := textinput.New()
+	pkgInput.Placeholder = "com.example.app"
+	pkgInput.CharLimit = 256
+	pkgInput.Width = 50
+	pkgInput.Focus()
+
+	return backupConfigModel{
+		packageInput: pkgInput,
+	}
+}
+
+func (m backupConfigModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m backupConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "enter":
+			if m.packageInput.Value() != "" {
+				m.packageName = m.packageInput.Value()
+				m.submitted = true
+				return m, tea.Quit
+			}
+		}
+	}
+
+	var cmd tea.Cmd
+	m.packageInput, cmd = m.packageInput.Update(msg)
+	return m, cmd
+}
+
+func (m backupConfigModel) View() string {
+	var s strings.Builder
+	s.WriteString(tui.RenderTitle("Android Backup Extractor"))
+	s.WriteString("\n\n")
+	s.WriteString(tui.RenderSubtitle("Enter the package name to backup"))
+	s.WriteString("\n\n")
+	s.WriteString(tui.InputLabelStyle.Render("Package Name: "))
+	s.WriteString(m.packageInput.View())
+	s.WriteString("\n\n")
+	s.WriteString(tui.RenderHelp("enter: create backup • q/esc: cancel"))
+
+	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
+}
+
+// ========== Handler Functions ==========
+
 // RunMobileModule displays the mobile module menu
 func RunMobileModule() {
 	items := []list.Item{
@@ -447,177 +796,112 @@ func runDeepAnalysis() {
 }
 
 func runLogcat() {
-	// Create simple text input for configuration
-	ti := textinput.New()
-	ti.Placeholder = "Package filter (optional, press Enter to skip)"
-	ti.Focus()
-	ti.CharLimit = 256
-	ti.Width = 50
-
-	fmt.Println(tui.RenderTitle("Logcat Monitor"))
-	fmt.Println()
-	fmt.Println(tui.RenderSubtitle("Configuration"))
-	fmt.Println()
-	
-	// Check for connected devices
+	// Check for connected devices first
 	devices, err := GetConnectedDevices()
 	if err != nil || len(devices) == 0 {
 		fmt.Println(tui.RenderError("No Android devices connected via ADB"))
 		fmt.Println(tui.RenderInfo("Connect device and enable USB debugging, then try again"))
 		return
 	}
-	
-	fmt.Printf("Device detected: %s\n\n", devices[0])
-	
-	// Get package filter
-	fmt.Print("Package filter (optional): ")
-	var packageFilter string
-	fmt.Scanln(&packageFilter)
-	
-	// Get log level
-	fmt.Println("\nSelect log level:")
-	fmt.Println("  V - Verbose")
-	fmt.Println("  D - Debug")
-	fmt.Println("  I - Info (default)")
-	fmt.Println("  W - Warning")
-	fmt.Println("  E - Error")
-	fmt.Print("Level [I]: ")
-	var levelInput string
-	fmt.Scanln(&levelInput)
-	
-	level := LogInfo
-	if levelInput != "" {
-		switch strings.ToUpper(levelInput) {
-		case "V":
-			level = LogVerbose
-		case "D":
-			level = LogDebug
-		case "W":
-			level = LogWarn
-		case "E":
-			level = LogError
-		case "F":
-			level = LogFatal
-		}
+
+	fmt.Printf("Device detected: %s\n", devices[0])
+
+	// Run TUI for configuration
+	p := tea.NewProgram(initialLogcatConfigModel())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
 	}
-	
-	config := LogcatConfig{
-		Level:         level,
-		PackageFilter: packageFilter,
-		ClearFirst:    true,
+
+	if m, ok := finalModel.(logcatConfigModel); ok && m.submitted {
+		fmt.Println()
+		MonitorLogcat(m.config)
 	}
-	
-	MonitorLogcat(config)
 }
 
 func runNetworkCapture() {
-	fmt.Println(tui.RenderTitle("Mobile Network Traffic Capture"))
-	fmt.Println()
-	
-	fmt.Println("Select proxy tool:")
-	fmt.Println("  1. mitmproxy")
-	fmt.Println("  2. Burp Suite")
-	fmt.Print("Choice [1]: ")
-	
-	var choice string
-	fmt.Scanln(&choice)
-	
-	proxyType := "mitmproxy"
-	if choice == "2" {
-		proxyType = "burp"
+	// Run TUI for configuration
+	p := tea.NewProgram(initialNetworkCaptureModel())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
 	}
-	
-	fmt.Print("\nEnter your computer's IP address [192.168.1.100]: ")
-	var proxyIP string
-	fmt.Scanln(&proxyIP)
-	if proxyIP == "" {
-		proxyIP = "192.168.1.100"
-	}
-	
-	fmt.Print("Enter proxy port [8080]: ")
-	var proxyPort string
-	fmt.Scanln(&proxyPort)
-	if proxyPort == "" {
-		proxyPort = "8080"
-	}
-	
-	guide := NetworkCaptureGuide{
-		ProxyType: proxyType,
-		ProxyIP:   proxyIP,
-		ProxyPort: proxyPort,
-	}
-	
-	DisplayNetworkCaptureInstructions(guide)
-	
-	fmt.Println("\nWould you like to configure proxy via ADB? (y/n): ")
-	var configure string
-	fmt.Scanln(&configure)
-	
-	if strings.ToLower(configure) == "y" {
-		if err := SetupADBProxy(proxyIP, proxyPort); err != nil {
-			fmt.Println(tui.RenderError(fmt.Sprintf("Failed to set proxy: %v", err)))
+
+	if m, ok := finalModel.(networkCaptureModel); ok && m.submitted {
+		fmt.Println()
+		DisplayNetworkCaptureInstructions(m.guide)
+
+		// Ask about ADB proxy configuration
+		fmt.Println("\nConfigure proxy via ADB? (y/n): ")
+		var configure string
+		fmt.Scanln(&configure)
+
+		if strings.ToLower(configure) == "y" {
+			if err := SetupADBProxy(m.guide.ProxyIP, m.guide.ProxyPort); err != nil {
+				fmt.Println(tui.RenderError(fmt.Sprintf("Failed to set proxy: %v", err)))
+			}
 		}
 	}
 }
 
 func runBackup() {
-	fmt.Println(tui.RenderTitle("Android Backup Extractor"))
-	fmt.Println()
-	
-	// Check for connected devices
+	// Check for connected devices first
 	devices, err := GetConnectedDevices()
 	if err != nil || len(devices) == 0 {
 		fmt.Println(tui.RenderError("No Android devices connected via ADB"))
 		return
 	}
-	
-	fmt.Printf("Device: %s\n\n", devices[0])
-	
-	fmt.Print("Enter package name (e.g., com.example.app): ")
-	var packageName string
-	fmt.Scanln(&packageName)
-	
-	if packageName == "" {
-		fmt.Println(tui.RenderError("Package name is required"))
+
+	fmt.Printf("Device: %s\n", devices[0])
+
+	// Run TUI for package name input
+	p := tea.NewProgram(initialBackupConfigModel())
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
-	
-	outputPath := packageName + "_backup.ab"
-	
-	config := BackupConfig{
-		PackageName: packageName,
-		OutputPath:  outputPath,
-		IncludeAPK:  true,
-		IncludeOBB:  false,
-		AllData:     false,
-	}
-	
-	if err := CreateBackup(config); err != nil {
-		fmt.Println(tui.RenderError(fmt.Sprintf("Backup failed: %v", err)))
-		return
-	}
-	
-	// Extract backup
-	fmt.Println("\nExtract backup? (y/n): ")
-	var extract string
-	fmt.Scanln(&extract)
-	
-	if strings.ToLower(extract) == "y" {
-		tarFile, err := ExtractBackup(outputPath)
-		if err != nil {
-			fmt.Println(tui.RenderError(fmt.Sprintf("Extraction failed: %v", err)))
+
+	if m, ok := finalModel.(backupConfigModel); ok && m.submitted {
+		outputPath := m.packageName + "_backup.ab"
+
+		config := BackupConfig{
+			PackageName: m.packageName,
+			OutputPath:  outputPath,
+			IncludeAPK:  true,
+			IncludeOBB:  false,
+			AllData:     false,
+		}
+
+		if err := CreateBackup(config); err != nil {
+			fmt.Println(tui.RenderError(fmt.Sprintf("Backup failed: %v", err)))
 			return
 		}
-		
-		// List contents
-		if err := ListBackupContents(tarFile); err != nil {
-			fmt.Println(tui.RenderError(fmt.Sprintf("Failed to list contents: %v", err)))
-			return
-		}
-		
-		// Security analysis
-		if err := AnalyzeBackupSecurity(tarFile); err != nil {
-			fmt.Println(tui.RenderError(fmt.Sprintf("Security analysis failed: %v", err)))
+
+		// Extract backup
+		fmt.Println("\nExtract backup? (y/n): ")
+		var extract string
+		fmt.Scanln(&extract)
+
+		if strings.ToLower(extract) == "y" {
+			tarFile, err := ExtractBackup(outputPath)
+			if err != nil {
+				fmt.Println(tui.RenderError(fmt.Sprintf("Extraction failed: %v", err)))
+				return
+			}
+
+			// List contents
+			if err := ListBackupContents(tarFile); err != nil {
+				fmt.Println(tui.RenderError(fmt.Sprintf("Failed to list contents: %v", err)))
+				return
+			}
+
+			// Security analysis
+			if err := AnalyzeBackupSecurity(tarFile); err != nil {
+				fmt.Println(tui.RenderError(fmt.Sprintf("Security analysis failed: %v", err)))
+			}
 		}
 	}
 }
