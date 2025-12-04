@@ -12,32 +12,40 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type vulnFormField struct {
+type mailFormField struct {
 	label       string
 	placeholder string
 	value       string
 	input       textinput.Model
 }
 
-type vulnFormModel struct {
-	fields  []vulnFormField
+type mailFormModel struct {
+	fields  []mailFormField
 	focused int
 	done    bool
 }
 
-func newVulnFormModel() vulnFormModel {
-	fields := []vulnFormField{
+func newMailFormModel() mailFormModel {
+	fields := []mailFormField{
 		{
-			label:       "Target URL",
-			placeholder: "http://example.com/page",
+			label:       "Heading",
+			placeholder: "Title of the Email",
 		},
 		{
-			label:       "Add custom headers? (Y/N)",
-			placeholder: "N",
+			label:       "Sender's Email",
+			placeholder: "sender@example.com",
 		},
 		{
-			label:       "Add cookies? (Y/N)",
-			placeholder: "N",
+			label:       "Sender's Name",
+			placeholder: "John Doe",
+		},
+		{
+			label:       "Recipient's Email",
+			placeholder: "recipient@example.com",
+		},
+		{
+			label:       "Cc",
+			placeholder: "[Optional]",
 		},
 	}
 
@@ -53,16 +61,16 @@ func newVulnFormModel() vulnFormModel {
 		fields[i].input = ti
 	}
 
-	return vulnFormModel{
+	return mailFormModel{
 		fields: fields,
 	}
 }
 
-func (m vulnFormModel) Init() tea.Cmd {
+func (m mailFormModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m vulnFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m mailFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -112,11 +120,11 @@ func (m vulnFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m vulnFormModel) View() string {
+func (m mailFormModel) View() string {
 	var s strings.Builder
-	s.WriteString(tui.RenderTitle("Website Vulnerability Scanner"))
+	s.WriteString(tui.RenderTitle("Automated Email Phishing"))
 	s.WriteString("\n\n")
-	s.WriteString(tui.RenderSubtitle("This tool checks for common web vulnerabilities like XSS, SQLi, LFI, etc."))
+	s.WriteString(tui.RenderSubtitle("This tool checks for sending emails and phishing"))
 	s.WriteString("\n\n")
 
 	for i, field := range m.fields {
@@ -216,136 +224,32 @@ func (m headerFormModel) View() string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
 }
 
-type cookieFormModel struct {
-	input    textinput.Model
-	value    string
-	done     bool
-	canceled bool
-}
-
-func newCookieFormModel() cookieFormModel {
-	ti := textinput.New()
-	ti.Placeholder = "key1=val1; key2=val2"
-	ti.Focus()
-	ti.CharLimit = 512
-	ti.Width = 60
-
-	return cookieFormModel{
-		input: ti,
-	}
-}
-
-func (m cookieFormModel) Init() tea.Cmd {
-	return textinput.Blink
-}
-
-func (m cookieFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q", "esc":
-			m.canceled = true
-			return m, tea.Quit
-		case "enter":
-			m.value = strings.TrimSpace(m.input.Value())
-			m.done = true
-			return m, tea.Quit
-		}
-	}
-
-	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	return m, cmd
-}
-
-func (m cookieFormModel) View() string {
-	var s strings.Builder
-	s.WriteString(tui.RenderTitle("Add Cookies"))
-	s.WriteString("\n\n")
-	s.WriteString(tui.RenderSubtitle("Enter cookies in the format: key1=val1; key2=val2"))
-	s.WriteString("\n\n")
-
-	s.WriteString(tui.InputLabelStyle.Render("Cookies: "))
-	s.WriteString("\n")
-	s.WriteString(tui.FocusedInputStyle.Render(m.input.View()))
-	s.WriteString("\n\n")
-	s.WriteString(tui.RenderHelp("enter: submit • q/esc: cancel"))
-
-	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
-}
-
-// Interact runs the vulnerability scanner with TUI
-func Interact() {
+// Interact runs the mail phishing module with TUI
+func RunEmailPhishModule() {
 	// Main form
-	p := tea.NewProgram(newVulnFormModel())
+	p := tea.NewProgram(newMailFormModel())
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
 
-	m, ok := finalModel.(vulnFormModel)
+	m, ok := finalModel.(mailFormModel)
 	if !ok || !m.done {
 		return
 	}
 
-	target := strings.TrimSpace(m.fields[0].value)
-	if target == "" {
-		fmt.Println(tui.RenderError("Target URL is required"))
+	heading := strings.TrimSpace(m.fields[0].value)
+	if heading == "" {
+		fmt.Println(tui.RenderError("Heading is required"))
 		return
-	}
-
-	addHeaders := strings.TrimSpace(m.fields[1].value)
-	addCookies := strings.TrimSpace(m.fields[2].value)
-
-	// Headers
-	headers := make(map[string]string)
-	if strings.EqualFold(addHeaders, "Y") {
-		p := tea.NewProgram(newHeaderFormModel())
-		finalModel, err := p.Run()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return
-		}
-		if hm, ok := finalModel.(headerFormModel); ok && !hm.canceled {
-			headers = hm.headers
-		}
-	}
-
-	// Cookies
-	cookies := ""
-	if strings.EqualFold(addCookies, "Y") {
-		p := tea.NewProgram(newCookieFormModel())
-		finalModel, err := p.Run()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return
-		}
-		if cm, ok := finalModel.(cookieFormModel); ok && !cm.canceled {
-			cookies = cm.value
-		}
 	}
 
 	// Start comprehensive scan
 	fmt.Println()
-	fmt.Println(tui.RenderInfo(fmt.Sprintf("Starting comprehensive vulnerability scan on: %s", target)))
 	fmt.Println(tui.RenderWarning("This will run ALL vulnerability scanners and may take several minutes..."))
 	fmt.Println()
 	time.Sleep(2 * time.Second)
 
-	err = RunAllVulnScanners(target, headers, cookies)
-	if err != nil {
-		fmt.Println(tui.RenderError(fmt.Sprintf("Scan failed: %v", err)))
-		return
-	}
-
 	fmt.Println()
-	fmt.Println(tui.RenderSuccess("✓ Scan complete!"))
-	fmt.Println(tui.RenderInfo(fmt.Sprintf("Total findings: %d", len(allUnifiedFindings))))
-	fmt.Println(tui.RenderHelp("HTML report has been generated. Check your home directory."))
-}
-
-func RunEmailPhishModule() {
-	// Implement email phishing module logic here
-	fmt.Println("Running email phishing module")
 }
