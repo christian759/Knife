@@ -41,7 +41,10 @@ A modern, terminal-based penetration testing toolkit built with Go and [Bubble T
 
 ### 🌐 Web Vulnerability Scanner
 - **Unified Scanning System**: Orchestrated vulnerability scanner with TUI-based scanner selection
-- **9 Vulnerability Scanners**: Comprehensive automated testing for:
+- **Network Exposure Focus**: Detects exposed web/network services and potential privilege-escalation paths
+- **Separate Network Modes**: Run network scanning as `infrastructure` (default), `web`, or `hybrid` profiles
+- **Server-Grade Fingerprinting**: Multi-IP host resolution with protocol-level probes (HTTP/TLS/SSH/SMTP/MySQL/PostgreSQL/Redis)
+- **14 Vulnerability Scanners**: Comprehensive automated testing for:
   - Cross-Site Scripting (XSS)
   - SQL Injection (SQLi)
   - Local File Inclusion (LFI)
@@ -52,10 +55,20 @@ A modern, terminal-based penetration testing toolkit built with Go and [Bubble T
   - Cross-Site Request Forgery (CSRF)
   - Directory Traversal
   - XML External Entity (XXE)
+  - Security Headers
+  - Sensitive Files
+  - Network Exposure & Privilege Escalation Paths
 - **Interactive Scanner Selection**: TUI for choosing which scanners to run
 - **Custom Headers & Cookies**: Support for authenticated testing
 - **Unified HTML Reports**: Consolidated vulnerability reports from all scanners with severity ratings
 - **Real-Time Progress**: Live scan progress monitoring in terminal
+
+Network scanner options (via `ScanConfig.ScannerOptions`):
+- `network_profile`: `infrastructure` (default), `web`, or `hybrid`
+- `network_ports`: custom ports/ranges like `22,80,443,8000-8010`
+- `network_workers`: override scanner worker count
+- `network_timeout_ms`: per-connection timeout in milliseconds
+- `network_deep_scan`: `true` to expand to broad infrastructure coverage (1-1024 + high-value ports)
 
 ### 📡 WiFi Attack Suite
 - **10 Attack Modes**: Complete wireless security testing toolkit

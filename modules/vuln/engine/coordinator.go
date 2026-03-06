@@ -3,6 +3,8 @@ package engine
 import (
 	"fmt"
 	"knife/modules/vuln/scanners"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -180,13 +182,55 @@ func (sc *ScannerCoordinator) runFilesScanner() error {
 
 // Network Scanner
 func (sc *ScannerCoordinator) runNetworkScanner() error {
-	scanner := scanners.NewNetworkScanner(sc.config.Target, sc.config.Workers, sc.config.Intensity)
+	opts := scanners.NetworkScanOptions{
+		Profile: sc.scannerOption("network_profile", "infrastructure"),
+	}
+
+	if deepRaw := strings.TrimSpace(sc.scannerOption("network_deep_scan", "")); deepRaw != "" {
+		switch strings.ToLower(deepRaw) {
+		case "1", "true", "yes", "on":
+			opts.DeepScan = true
+		}
+	}
+
+	if workersRaw := strings.TrimSpace(sc.scannerOption("network_workers", "")); workersRaw != "" {
+		if workers, err := strconv.Atoi(workersRaw); err == nil && workers > 0 {
+			opts.Workers = workers
+		}
+	}
+
+	if timeoutRaw := strings.TrimSpace(sc.scannerOption("network_timeout_ms", "")); timeoutRaw != "" {
+		if ms, err := strconv.Atoi(timeoutRaw); err == nil && ms > 0 {
+			opts.Timeout = time.Duration(ms) * time.Millisecond
+		}
+	}
+
+	if portsRaw := strings.TrimSpace(sc.scannerOption("network_ports", "")); portsRaw != "" {
+		ports, err := scanners.ParseNetworkPorts(portsRaw)
+		if err != nil {
+			return fmt.Errorf("invalid network_ports value: %w", err)
+		}
+		opts.Ports = ports
+	}
+
+	scanner := scanners.NewNetworkScannerWithOptions(sc.config.Target, sc.config.Workers, sc.config.Intensity, opts)
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertNetworkFinding(f, sc.config.Target))
 	}
-	fmt.Printf("[✓] Network Scanner: Found %d open ports\n", len(scanner.Findings))
+	fmt.Printf("[✓] Network Scanner (%s): Found %d open ports/services\n", opts.Profile, len(scanner.Findings))
 	return nil
+}
+
+func (sc *ScannerCoordinator) scannerOption(key, defaultVal string) string {
+	if sc.config.ScannerOptions == nil {
+		return defaultVal
+	}
+	val, ok := sc.config.ScannerOptions[key]
+	if !ok || strings.TrimSpace(val) == "" {
+		return defaultVal
+	}
+	return val
 }
 
 // XSS Scanner

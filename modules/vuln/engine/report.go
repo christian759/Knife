@@ -166,6 +166,15 @@ func vulnDetails(name string) VulnInfo {
 			Investigation: "Use browser developer tools or 'curl -I' to inspect server response headers.",
 		}
 
+	case strings.Contains(n, "network service") || strings.Contains(n, "open port") || strings.Contains(n, "priv-esc path"):
+		return VulnInfo{
+			Severity:      "High",
+			Description:   "Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.",
+			Fix:           "Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.",
+			Exploitation:  "Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.",
+			Investigation: "Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.",
+		}
+
 	case strings.Contains(n, "file") || strings.Contains(n, "discovery"):
 		return VulnInfo{
 			Severity:      "High",

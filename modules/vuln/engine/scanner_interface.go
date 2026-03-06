@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"knife/modules/vuln/db"
@@ -12,22 +13,22 @@ import (
 // This provides a common structure for reporting all vulnerability types
 type UnifiedFinding struct {
 	// Core fields
-	Type      string    `json:"type"`       // e.g., "XSS", "CSRF", "SQL Injection"
-	Name      string    `json:"name"`       // Detailed vulnerability name
-	URL       string    `json:"url"`        // Affected URL
-	Severity  string    `json:"severity"`   // Critical, High, Medium, Low
-	Timestamp time.Time `json:"timestamp"`  // When the finding was discovered
-	
+	Type      string    `json:"type"`      // e.g., "XSS", "CSRF", "SQL Injection"
+	Name      string    `json:"name"`      // Detailed vulnerability name
+	URL       string    `json:"url"`       // Affected URL
+	Severity  string    `json:"severity"`  // Critical, High, Medium, Low
+	Timestamp time.Time `json:"timestamp"` // When the finding was discovered
+
 	// Request details
-	Method     string `json:"method,omitempty"`      // GET, POST, etc.
-	Param      string `json:"param,omitempty"`       // Vulnerable parameter
-	Payload    string `json:"payload,omitempty"`     // Payload that triggered the finding
-	
+	Method  string `json:"method,omitempty"`  // GET, POST, etc.
+	Param   string `json:"param,omitempty"`   // Vulnerable parameter
+	Payload string `json:"payload,omitempty"` // Payload that triggered the finding
+
 	// Response details
 	StatusCode      int    `json:"status_code,omitempty"`
 	Evidence        string `json:"evidence,omitempty"`         // Matched content or proof
 	ResponseSnippet string `json:"response_snippet,omitempty"` // Truncated response
-	
+
 	// Additional context
 	Context      string            `json:"context,omitempty"`       // Additional context (e.g., DOM, Headers)
 	Location     string            `json:"location,omitempty"`      // For redirects
@@ -35,37 +36,37 @@ type UnifiedFinding struct {
 	MissingToken bool              `json:"missing_token,omitempty"` // For CSRF
 	PostedData   map[string]string `json:"posted_data,omitempty"`   // For stored XSS
 	CVE          string            `json:"cve,omitempty"`           // Linked CVE ID
-	
+
 	// Raw finding data (for detailed inspection)
 	RawFinding interface{} `json:"-"` // Original scanner-specific finding
 }
 
 // ScanProgress represents the current state of a scanning operation
 type ScanProgress struct {
-	ScannerName    string
-	Status         string // "running", "completed", "failed"
-	FindingsCount  int
-	PagesScanned   int
-	Error          error
+	ScannerName   string
+	Status        string // "running", "completed", "failed"
+	FindingsCount int
+	PagesScanned  int
+	Error         error
 }
 
 // ScannerType is an alias for db.ScannerType
 type ScannerType = db.ScannerType
 
 const (
-	ScannerXSS               = db.ScannerXSS
-	ScannerCSRF              = db.ScannerCSRF
-	ScannerSQL               = db.ScannerSQL
-	ScannerLFI               = db.ScannerLFI
-	ScannerSSRF              = db.ScannerSSRF
-	ScannerCommandInjection  = db.ScannerCommandInjection
-	ScannerRCE               = db.ScannerRCE
+	ScannerXSS                = db.ScannerXSS
+	ScannerCSRF               = db.ScannerCSRF
+	ScannerSQL                = db.ScannerSQL
+	ScannerLFI                = db.ScannerLFI
+	ScannerSSRF               = db.ScannerSSRF
+	ScannerCommandInjection   = db.ScannerCommandInjection
+	ScannerRCE                = db.ScannerRCE
 	ScannerDirectoryTraversal = db.ScannerDirectoryTraversal
-	ScannerXXE               = db.ScannerXXE
-	ScannerOpenRedirect      = db.ScannerOpenRedirect
-	ScannerHeaders           = db.ScannerHeaders
-	ScannerFiles             = db.ScannerFiles
-	ScannerNetwork           = db.ScannerNetwork
+	ScannerXXE                = db.ScannerXXE
+	ScannerOpenRedirect       = db.ScannerOpenRedirect
+	ScannerHeaders            = db.ScannerHeaders
+	ScannerFiles              = db.ScannerFiles
+	ScannerNetwork            = db.ScannerNetwork
 )
 
 // ScannerInfo provides metadata about a scanner
@@ -149,6 +150,12 @@ func GetScannerInfo() []ScannerInfo {
 			Type:        ScannerFiles,
 			Name:        "Sensitive Files",
 			Description: "Discovers exposed sensitive files and directories",
+			Severity:    "High",
+		},
+		{
+			Type:        ScannerNetwork,
+			Name:        "Network Exposure & Privilege Escalation",
+			Description: "Finds exposed web/network services and likely privilege-escalation paths",
 			Severity:    "High",
 		},
 	}
@@ -312,12 +319,12 @@ func ConvertSQLFinding(f scanners.FindingSQL) UnifiedFinding {
 func ConvertHeaderFinding(f scanners.FindingHeader) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
-		Type:      "Security Header",
-		Name:      f.Type,
-		URL:       f.URL,
-		Severity:  "Low",
-		Timestamp: timestamp,
-		Evidence:  f.Evidence,
+		Type:       "Security Header",
+		Name:       f.Type,
+		URL:        f.URL,
+		Severity:   "Low",
+		Timestamp:  timestamp,
+		Evidence:   f.Evidence,
 		RawFinding: f,
 	}
 }
@@ -325,13 +332,18 @@ func ConvertHeaderFinding(f scanners.FindingHeader) UnifiedFinding {
 // ConvertFileFinding converts scanners.FindingFile to UnifiedFinding
 func ConvertFileFinding(f scanners.FindingFile) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
+	evidence := f.Evidence
+	if f.Confidence != "" {
+		evidence = fmt.Sprintf("confidence=%s | %s", f.Confidence, evidence)
+	}
 	return UnifiedFinding{
-		Type:      "Sensitive File",
-		Name:      f.Type,
-		URL:       f.URL,
-		Severity:  "High",
-		Timestamp: timestamp,
-		Evidence:  f.Evidence,
+		Type:       "Sensitive File",
+		Name:       f.Type,
+		URL:        f.URL,
+		Severity:   "High",
+		Timestamp:  timestamp,
+		StatusCode: f.StatusCode,
+		Evidence:   evidence,
 		RawFinding: f,
 	}
 }
@@ -354,13 +366,49 @@ func ConvertRedirectFinding(f scanners.FindingRedirect) UnifiedFinding {
 
 // ConvertNetworkFinding converts NetworkFinding to UnifiedFinding
 func ConvertNetworkFinding(f scanners.NetworkFinding, target string) UnifiedFinding {
+	url := target
+	if f.Endpoint != "" {
+		url = f.Endpoint
+	}
+	evidence := fmt.Sprintf("status=%s protocol=%s", f.State, f.Protocol)
+	if f.Banner != "" {
+		evidence += fmt.Sprintf(" banner=%s", f.Banner)
+	}
+	if f.Risk != "" {
+		evidence += fmt.Sprintf(" risk=%s", f.Risk)
+	}
+	if f.Recommendation != "" {
+		evidence += fmt.Sprintf(" recommendation=%s", f.Recommendation)
+	}
+	if f.PrivEscPath {
+		evidence += " priv_esc_path=true"
+	}
+	if f.Category != "" {
+		evidence += fmt.Sprintf(" category=%s", f.Category)
+	}
+
+	severity := "Medium"
+	switch {
+	case strings.Contains(strings.ToLower(f.Risk), "critical"):
+		severity = "Critical"
+	case strings.Contains(strings.ToLower(f.Risk), "high"):
+		severity = "High"
+	case strings.Contains(strings.ToLower(f.Risk), "low"):
+		severity = "Low"
+	}
+
+	name := fmt.Sprintf("Open Port: %d (%s)", f.Port, f.Service)
+	if f.PrivEscPath {
+		name = fmt.Sprintf("Priv-Esc Path: %d (%s)", f.Port, f.Service)
+	}
+
 	return UnifiedFinding{
-		Type:            "Network Service",
-		Name:            fmt.Sprintf("Open Port: %d (%s)", f.Port, f.Service),
-		URL:             target,
-		Severity:        "Medium",
-		Timestamp:       time.Now(),
-		Evidence:        fmt.Sprintf("Status: %s, Banner: %s", f.State, f.Banner),
-		RawFinding:      f,
+		Type:       "Network Service",
+		Name:       name,
+		URL:        url,
+		Severity:   severity,
+		Timestamp:  time.Now(),
+		Evidence:   evidence,
+		RawFinding: f,
 	}
 }

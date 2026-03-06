@@ -17,8 +17,9 @@ import (
 	"knife/tui"
 )
 
-// vulnFormField represents a configuration form field
+// vulnFormField represents a configuration form field.
 type vulnFormField struct {
+	key         string
 	label       string
 	placeholder string
 	value       string
@@ -42,12 +43,17 @@ type mainModel struct {
 	focusedField int
 	progress     progress.Model
 
+	// Window
+	windowWidth  int
+	windowHeight int
+
 	// Data
 	targetURL          string
 	availableScanners  []engine.ScannerInfo
 	selected           map[engine.ScannerType]bool
 	scannerCursor      int
 	uiError            string
+	uiNotice           string
 	scannerStatus      map[string]string
 	scannerFindings    map[string]int
 	scanStartedAt      time.Time
@@ -59,9 +65,16 @@ type mainModel struct {
 	showEvidence       bool
 
 	// Scan settings
-	workers   int
-	intensity int
-	depth     int
+	workers          int
+	intensity        int
+	depth            int
+	maxPages         int
+	throttleMS       int
+	networkProfile   string
+	networkPorts     string
+	networkTimeoutMS int
+	networkWorkers   int
+	networkDeepScan  bool
 
 	// Execution
 	coordinator *engine.ScannerCoordinator
@@ -74,20 +87,28 @@ func initialModel() mainModel {
 	ti := textinput.New()
 	ti.Placeholder = "https://example.com"
 	ti.Focus()
-	ti.CharLimit = 156
-	ti.Width = 60
+	ti.CharLimit = 256
+	ti.Width = 72
 
 	p := progress.New(progress.WithDefaultGradient())
 
 	configFields := []vulnFormField{
-		{label: "Workers (Concurrency)", placeholder: "10", value: "10"},
-		{label: "Intensity (1-5)", placeholder: "3", value: "3"},
-		{label: "Max Crawl Depth", placeholder: "2", value: "2"},
+		{key: "workers", label: "Workers (Concurrency)", placeholder: "10", value: "10"},
+		{key: "intensity", label: "Intensity (1-5)", placeholder: "3", value: "3"},
+		{key: "depth", label: "Max Crawl Depth", placeholder: "2", value: "2"},
+		{key: "max_pages", label: "Max Crawl Pages", placeholder: "50", value: "50"},
+		{key: "throttle_ms", label: "Throttle (ms)", placeholder: "100", value: "100"},
+		{key: "network_profile", label: "Network Profile", placeholder: "infrastructure|web|hybrid", value: "infrastructure"},
+		{key: "network_ports", label: "Network Ports (optional)", placeholder: "22,80,443,8000-8010", value: ""},
+		{key: "network_timeout_ms", label: "Network Timeout (ms)", placeholder: "2000", value: "2000"},
+		{key: "network_workers", label: "Network Workers (optional)", placeholder: "20", value: ""},
+		{key: "network_deep_scan", label: "Network Deep Scan", placeholder: "false", value: "false"},
 	}
 	for i := range configFields {
 		cti := textinput.New()
 		cti.Placeholder = configFields[i].placeholder
 		cti.SetValue(configFields[i].value)
+		cti.Width = 58
 		configFields[i].input = cti
 	}
 
@@ -109,6 +130,11 @@ func initialModel() mainModel {
 		workers:            10,
 		intensity:          3,
 		depth:              2,
+		maxPages:           50,
+		throttleMS:         100,
+		networkProfile:     "infrastructure",
+		networkTimeoutMS:   2000,
+		networkDeepScan:    false,
 		progressPercent:    0,
 		lastProgressUpdate: "waiting",
 		activityLog:        []string{},
@@ -136,7 +162,13 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		m.progress.Width = msg.Width - 10
+		m.windowWidth = msg.Width
+		m.windowHeight = msg.Height
+		m.targetInput.Width = max(48, msg.Width-24)
+		m.progress.Width = max(24, msg.Width-16)
+		for i := range m.configFields {
+			m.configFields[i].input.Width = max(36, msg.Width-34)
+		}
 		return m, nil
 
 	case scanProgressMsg:
@@ -147,7 +179,7 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scannerStatus[msg.ScannerName] = msg.Status
 			m.scannerFindings[msg.ScannerName] = msg.FindingsCount
 			m.lastProgressUpdate = fmt.Sprintf("%s: %s (%s)", msg.ScannerName, msg.Status, m.scannerGoal(msg.ScannerName))
-			m.appendActivity(fmt.Sprintf("[%s] %s (%s) findings=%d", msg.ScannerName, strings.ToUpper(msg.Status), m.scannerMethod(msg.ScannerName), msg.FindingsCount))
+			m.appendActivity(fmt.Sprintf("[%s] %s findings=%d", msg.ScannerName, strings.ToUpper(msg.Status), msg.FindingsCount))
 		}
 
 		total := m.selectedCount()
@@ -216,6 +248,7 @@ func (m mainModel) updateTarget(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.uiError = ""
+			m.uiNotice = ""
 			m.state = stateScanners
 			return m, nil
 		}
@@ -249,23 +282,36 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cur := m.availableScanners[m.scannerCursor]
 			m.selected[cur.Type] = !m.selected[cur.Type]
 			m.uiError = ""
+			m.uiNotice = ""
 			return m, nil
 		case "a":
 			for _, s := range m.availableScanners {
 				m.selected[s.Type] = true
 			}
+			m.uiNotice = "all scanners selected"
 			m.uiError = ""
 			return m, nil
 		case "n":
 			for _, s := range m.availableScanners {
 				m.selected[s.Type] = false
 			}
+			m.uiNotice = "all scanners cleared"
 			m.uiError = ""
+			return m, nil
+		case "1":
+			m.applyPreset("web")
+			return m, nil
+		case "2":
+			m.applyPreset("network")
+			return m, nil
+		case "3":
+			m.applyPreset("full")
 			return m, nil
 		case "i":
 			for _, s := range m.availableScanners {
 				m.selected[s.Type] = !m.selected[s.Type]
 			}
+			m.uiNotice = "selection inverted"
 			m.uiError = ""
 			return m, nil
 		case "b":
@@ -277,6 +323,7 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.uiError = ""
+			m.uiNotice = ""
 			m.state = stateConfig
 			m.focusedField = 0
 			m.configFields[0].input.Focus()
@@ -284,6 +331,44 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m *mainModel) applyPreset(preset string) {
+	for _, s := range m.availableScanners {
+		m.selected[s.Type] = false
+	}
+
+	switch preset {
+	case "web":
+		for _, s := range m.availableScanners {
+			if s.Type != engine.ScannerNetwork {
+				m.selected[s.Type] = true
+			}
+		}
+		m.uiNotice = "preset applied: web app focus"
+	case "network":
+		enabled := map[engine.ScannerType]bool{
+			engine.ScannerNetwork:          true,
+			engine.ScannerSSRF:             true,
+			engine.ScannerXXE:              true,
+			engine.ScannerRCE:              true,
+			engine.ScannerCommandInjection: true,
+			engine.ScannerHeaders:          true,
+			engine.ScannerFiles:            true,
+		}
+		for _, s := range m.availableScanners {
+			if enabled[s.Type] {
+				m.selected[s.Type] = true
+			}
+		}
+		m.uiNotice = "preset applied: network and privilege-escalation focus"
+	default:
+		for _, s := range m.availableScanners {
+			m.selected[s.Type] = true
+		}
+		m.uiNotice = "preset applied: full coverage"
+	}
+	m.uiError = ""
 }
 
 func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -298,6 +383,18 @@ func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.focusedField--
 		case "down", "tab":
 			m.focusedField++
+		case "left", "h":
+			if m.configFields[m.focusedField].key == "network_profile" {
+				m.cycleNetworkProfile(-1)
+				m.parseConfigValues()
+				return m, nil
+			}
+		case "right", "l":
+			if m.configFields[m.focusedField].key == "network_profile" {
+				m.cycleNetworkProfile(1)
+				m.parseConfigValues()
+				return m, nil
+			}
 		case "ctrl+s":
 			return m.startScan()
 		case "enter":
@@ -331,16 +428,87 @@ func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m *mainModel) cycleNetworkProfile(delta int) {
+	profiles := []string{"infrastructure", "web", "hybrid"}
+	cur := strings.ToLower(strings.TrimSpace(m.configFields[m.focusedField].input.Value()))
+	idx := 0
+	for i := range profiles {
+		if profiles[i] == cur {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + len(profiles)) % len(profiles)
+	m.configFields[m.focusedField].input.SetValue(profiles[idx])
+}
+
 func (m *mainModel) parseConfigValues() {
-	if v, err := strconv.Atoi(strings.TrimSpace(m.configFields[0].input.Value())); err == nil {
-		m.workers = v
+	for i := range m.configFields {
+		val := strings.TrimSpace(m.configFields[i].input.Value())
+		switch m.configFields[i].key {
+		case "workers":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.workers = v
+			}
+		case "intensity":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.intensity = v
+			}
+		case "depth":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.depth = v
+			}
+		case "max_pages":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.maxPages = v
+			}
+		case "throttle_ms":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.throttleMS = v
+			}
+		case "network_profile":
+			m.networkProfile = strings.ToLower(val)
+		case "network_ports":
+			m.networkPorts = val
+		case "network_timeout_ms":
+			if v, err := strconv.Atoi(val); err == nil {
+				m.networkTimeoutMS = v
+			}
+		case "network_workers":
+			if val == "" {
+				m.networkWorkers = 0
+			} else if v, err := strconv.Atoi(val); err == nil {
+				m.networkWorkers = v
+			}
+		case "network_deep_scan":
+			switch strings.ToLower(val) {
+			case "1", "true", "yes", "on":
+				m.networkDeepScan = true
+			default:
+				m.networkDeepScan = false
+			}
+		}
 	}
-	if v, err := strconv.Atoi(strings.TrimSpace(m.configFields[1].input.Value())); err == nil {
-		m.intensity = v
+}
+
+func normalizeNetworkProfile(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	switch raw {
+	case "infrastructure", "infra", "web", "hybrid", "mixed", "all":
+		if raw == "infra" {
+			return "infrastructure"
+		}
+		if raw == "mixed" || raw == "all" {
+			return "hybrid"
+		}
+		return raw
+	default:
+		return ""
 	}
-	if v, err := strconv.Atoi(strings.TrimSpace(m.configFields[2].input.Value())); err == nil {
-		m.depth = v
-	}
+}
+
+func (m mainModel) networkSelected() bool {
+	return m.selected[engine.ScannerNetwork]
 }
 
 func (m mainModel) startScan() (tea.Model, tea.Cmd) {
@@ -361,6 +529,30 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 		m.uiError = "max crawl depth must be >= 1"
 		return m, nil
 	}
+	if m.maxPages < 1 {
+		m.uiError = "max crawl pages must be >= 1"
+		return m, nil
+	}
+	if m.throttleMS < 0 {
+		m.uiError = "throttle must be >= 0"
+		return m, nil
+	}
+
+	networkProfile := normalizeNetworkProfile(m.networkProfile)
+	if m.networkSelected() {
+		if networkProfile == "" {
+			m.uiError = "network profile must be infrastructure, web, or hybrid"
+			return m, nil
+		}
+		if m.networkTimeoutMS < 100 {
+			m.uiError = "network timeout must be >= 100ms"
+			return m, nil
+		}
+		if m.networkWorkers < 0 {
+			m.uiError = "network workers must be >= 0"
+			return m, nil
+		}
+	}
 
 	m.state = stateScanning
 	m.scanStartedAt = time.Now()
@@ -369,12 +561,28 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 	m.scannerStatus = make(map[string]string)
 	m.scannerFindings = make(map[string]int)
 	m.uiError = ""
-	m.activityLog = []string{fmt.Sprintf("[setup] starting scan on %s", m.targetURL)}
+	m.uiNotice = ""
+	m.activityLog = []string{fmt.Sprintf("[setup] target=%s", m.targetURL)}
 
 	enabled := make([]engine.ScannerType, 0, m.selectedCount())
 	for _, s := range m.availableScanners {
 		if m.selected[s.Type] {
 			enabled = append(enabled, s.Type)
+		}
+	}
+
+	scannerOptions := make(map[string]string)
+	if m.networkSelected() {
+		scannerOptions["network_profile"] = networkProfile
+		scannerOptions["network_timeout_ms"] = strconv.Itoa(m.networkTimeoutMS)
+		if strings.TrimSpace(m.networkPorts) != "" {
+			scannerOptions["network_ports"] = strings.TrimSpace(m.networkPorts)
+		}
+		if m.networkWorkers > 0 {
+			scannerOptions["network_workers"] = strconv.Itoa(m.networkWorkers)
+		}
+		if m.networkDeepScan {
+			scannerOptions["network_deep_scan"] = "true"
 		}
 	}
 
@@ -384,9 +592,10 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 		Workers:         m.workers,
 		Intensity:       m.intensity,
 		MaxDepth:        m.depth,
-		MaxPages:        50,
-		Throttle:        100 * time.Millisecond,
+		MaxPages:        m.maxPages,
+		Throttle:        time.Duration(m.throttleMS) * time.Millisecond,
 		CustomPayloads:  make(map[string][]string),
+		ScannerOptions:  scannerOptions,
 	}
 
 	m.coordinator = engine.NewScannerCoordinator(config)
@@ -444,8 +653,8 @@ func (m *mainModel) appendActivity(line string) {
 		return
 	}
 	m.activityLog = append(m.activityLog, line)
-	if len(m.activityLog) > 30 {
-		m.activityLog = m.activityLog[len(m.activityLog)-30:]
+	if len(m.activityLog) > 40 {
+		m.activityLog = m.activityLog[len(m.activityLog)-40:]
 	}
 }
 
@@ -492,7 +701,7 @@ func (m mainModel) scannerMethod(scannerType string) string {
 	case string(engine.ScannerFiles):
 		return "common sensitive path discovery"
 	case string(engine.ScannerNetwork):
-		return "port/service enumeration"
+		return "infrastructure port/service exposure checks"
 	default:
 		return "automated scanner logic"
 	}
@@ -524,8 +733,8 @@ func findingGoal(findingType string) string {
 		return "find missing hardening headers"
 	case "files":
 		return "find exposed sensitive files"
-	case "network":
-		return "find open ports and exposed services"
+	case "network service":
+		return "find exposed ports, admin planes, and pivot paths"
 	default:
 		return "identify suspicious behavior requiring review"
 	}
@@ -558,11 +767,35 @@ func (m mainModel) scannerSeverityStyle(sev string) lipgloss.Style {
 	}
 }
 
+func (m mainModel) renderTopBar() string {
+	stage := map[vulnSessionState]string{
+		stateTarget:   "Target",
+		stateScanners: "Scanners",
+		stateConfig:   "Config",
+		stateScanning: "Scanning",
+		stateSummary:  "Summary",
+	}[m.state]
+
+	left := fmt.Sprintf("Stage: %s", stage)
+	right := fmt.Sprintf("Selected: %d/%d", m.selectedCount(), len(m.availableScanners))
+	if m.state == stateScanning {
+		right = fmt.Sprintf("Progress: %d%%", int(m.progressPercent*100))
+	}
+
+	available := max(20, m.windowWidth-8)
+	space := available - lipgloss.Width(left) - lipgloss.Width(right)
+	if space < 1 {
+		space = 1
+	}
+	line := left + strings.Repeat(" ", space) + right
+	return tui.RenderBox(line)
+}
+
 func (m mainModel) renderScannerPicker() string {
-	var b strings.Builder
-	b.WriteString(tui.RenderTitle("Scanner Selection"))
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("Selected: %d/%d\n\n", m.selectedCount(), len(m.availableScanners)))
+	var list strings.Builder
+	list.WriteString(tui.RenderTitle("Scanner Selection"))
+	list.WriteString("\n")
+	list.WriteString(fmt.Sprintf("Selected: %d/%d\n\n", m.selectedCount(), len(m.availableScanners)))
 
 	for i, s := range m.availableScanners {
 		cursor := " "
@@ -573,38 +806,66 @@ func (m mainModel) renderScannerPicker() string {
 		if m.selected[s.Type] {
 			check = "[x]"
 		}
-		line := fmt.Sprintf("%s %s %-34s ", cursor, check, s.Name)
-		b.WriteString(line)
-		b.WriteString(m.scannerSeverityStyle(s.Severity).Render("[" + strings.ToUpper(s.Severity) + "]"))
-		b.WriteString("\n")
+		line := fmt.Sprintf("%s %s %-36s ", cursor, check, s.Name)
+		list.WriteString(line)
+		list.WriteString(m.scannerSeverityStyle(s.Severity).Render("[" + strings.ToUpper(s.Severity) + "]"))
+		list.WriteString("\n")
 	}
 
+	detail := ""
 	if len(m.availableScanners) > 0 {
 		current := m.availableScanners[m.scannerCursor]
-		b.WriteString("\n")
-		b.WriteString(tui.RenderBox(fmt.Sprintf("What we search for: %s\nHow we test: %s\nType: %s", current.Description, m.scannerMethod(string(current.Type)), current.Type)))
+		detail = tui.RenderBox(fmt.Sprintf("Type: %s\nGoal: %s\nMethod: %s", current.Type, current.Description, m.scannerMethod(string(current.Type))))
 	}
 
-	if m.uiError != "" {
-		b.WriteString("\n")
-		b.WriteString(tui.RenderError(m.uiError))
+	presets := tui.RenderBox("Presets\n1: Web App\n2: Network / Priv-Esc\n3: Full Coverage")
+
+	leftW := max(60, m.windowWidth/2)
+	rightW := max(38, m.windowWidth-leftW-10)
+	leftPanel := lipgloss.NewStyle().Width(leftW).Render(list.String())
+	rightPanel := lipgloss.NewStyle().Width(rightW).Render(detail + "\n\n" + presets)
+
+	var body string
+	if m.windowWidth > 120 {
+		body = lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, "  ", rightPanel)
+	} else {
+		body = leftPanel + "\n" + rightPanel
 	}
-	b.WriteString("\n\n")
-	b.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | a: all | n: none | i: invert | b: back | enter: continue | esc: quit"))
-	return b.String()
+
+	var footer strings.Builder
+	if m.uiError != "" {
+		footer.WriteString("\n" + tui.RenderError(m.uiError))
+	} else if m.uiNotice != "" {
+		footer.WriteString("\n" + tui.RenderInfo(m.uiNotice))
+	}
+	footer.WriteString("\n\n")
+	footer.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | 1/2/3: presets | a: all | n: none | i: invert | b: back | enter: continue | esc: quit"))
+
+	return body + footer.String()
 }
 
 func (m mainModel) renderConfig() string {
 	var b strings.Builder
 	b.WriteString(tui.RenderTitle("Scan Configuration"))
 	b.WriteString("\n")
+	if m.networkSelected() {
+		b.WriteString(tui.RenderInfo("Network scanner selected: architecture options will be applied."))
+	} else {
+		b.WriteString(tui.RenderWarning("Network scanner not selected: network options will be ignored."))
+	}
+	b.WriteString("\n\n")
 
 	for i, f := range m.configFields {
-		label := f.label + ":"
+		prefix := "APP"
+		if strings.HasPrefix(f.key, "network_") {
+			prefix = "NET"
+		}
+
+		line := fmt.Sprintf("[%s] %s", prefix, f.label)
 		if i == m.focusedField {
-			b.WriteString(tui.SelectedItemStyle.Render("> " + label))
+			b.WriteString(tui.SelectedItemStyle.Render("> " + line))
 		} else {
-			b.WriteString(tui.NormalItemStyle.Render("  " + label))
+			b.WriteString(tui.NormalItemStyle.Render("  " + line))
 		}
 		b.WriteString("\n")
 		b.WriteString(f.input.View())
@@ -612,10 +873,9 @@ func (m mainModel) renderConfig() string {
 	}
 
 	if m.uiError != "" {
-		b.WriteString(tui.RenderError(m.uiError))
-		b.WriteString("\n")
+		b.WriteString(tui.RenderError(m.uiError) + "\n")
 	}
-	b.WriteString(tui.RenderHelp("tab/arrows: move | enter on last field or ctrl+s: start | b: back | esc: quit"))
+	b.WriteString(tui.RenderHelp("tab/arrows: move | left/right on Network Profile: cycle | enter on last field or ctrl+s: start | b: back | esc: quit"))
 	return b.String()
 }
 
@@ -639,16 +899,13 @@ func (m mainModel) renderScanning() string {
 		status := m.formatScannerStatus(info.Type)
 		findings := m.scannerFindings[string(info.Type)]
 		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d\n", string(info.Type), status, findings))
-		b.WriteString(fmt.Sprintf("  searching for: %s\n", info.Description))
-		b.WriteString(fmt.Sprintf("  method: %s\n", m.scannerMethod(string(info.Type))))
 	}
 
-	b.WriteString("\n")
-	b.WriteString("Recent activity:\n")
+	b.WriteString("\nRecent activity:\n")
 	if len(m.activityLog) == 0 {
 		b.WriteString("- waiting for first scanner event...\n")
 	} else {
-		start := len(m.activityLog) - 8
+		start := len(m.activityLog) - 10
 		if start < 0 {
 			start = 0
 		}
@@ -712,7 +969,7 @@ func (m mainModel) renderSummary() string {
 				m.summaryCursor = 0
 			}
 			b.WriteString("\nFindings Browser:\n")
-			window := 8
+			window := 10
 			start := m.summaryCursor - window/2
 			if start < 0 {
 				start = 0
@@ -759,6 +1016,8 @@ func (m mainModel) renderSummary() string {
 func (m mainModel) View() string {
 	var s strings.Builder
 	s.WriteString(tui.GetScaryLogo())
+	s.WriteString("\n")
+	s.WriteString(m.renderTopBar())
 	s.WriteString("\n\n")
 
 	switch m.state {
@@ -769,8 +1028,7 @@ func (m mainModel) View() string {
 		s.WriteString("\n")
 		s.WriteString(tui.FocusedInputStyle.Render(m.targetInput.View()))
 		if m.uiError != "" {
-			s.WriteString("\n")
-			s.WriteString(tui.RenderError(m.uiError))
+			s.WriteString("\n" + tui.RenderError(m.uiError))
 		}
 		s.WriteString("\n\n")
 		s.WriteString(tui.RenderHelp("enter: continue | esc: quit"))
@@ -785,6 +1043,13 @@ func (m mainModel) View() string {
 	}
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // Interact runs the vulnerability scanner TUI.
