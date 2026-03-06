@@ -217,76 +217,56 @@ func (sc *ScannerCoordinator) runCSRFScanner() error {
 
 // LFI Scanner
 func (sc *ScannerCoordinator) runLFIScanner() error {
-	scanner, err := NewLFIScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewLFIScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["lfi"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertLFIFinding(f))
 	}
-	
 	fmt.Printf("[✓] LFI Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
 
 // SSRF Scanner
 func (sc *ScannerCoordinator) runSSRFScanner() error {
-	scanner, err := NewSSRFScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewSSRFScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["ssrf"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertSSRFFinding(f))
 	}
-	
 	fmt.Printf("[✓] SSRF Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
 
 // Command Injection Scanner
 func (sc *ScannerCoordinator) runCommandInjectionScanner() error {
-	scanner, err := NewCmdInjScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewCmdInjScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["command_injection"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertCmdInjFinding(f))
 	}
-	
 	fmt.Printf("[✓] Command Injection Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
 
 // RCE Scanner
 func (sc *ScannerCoordinator) runRCEScanner() error {
-	scanner, err := NewRCEScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewRCEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["rce"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertRCEFinding(f))
 	}
-	
 	fmt.Printf("[✓] RCE Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }

