@@ -300,20 +300,15 @@ func (sc *ScannerCoordinator) runXXEScanner() error {
 }
 
 // Open Redirect Scanner
-func (sc *ScannerCoordinator) runOpenRedirectScanner() error {
-	scanner, err := NewRedirectScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+func (sc *ScannerCoordinator) runRedirectScanner() error {
+	scanner, err := NewRedirectScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["open_redirect"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertRedirectFinding(f))
 	}
-	
 	fmt.Printf("[✓] Open Redirect Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
