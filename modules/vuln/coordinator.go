@@ -16,6 +16,11 @@ type ScanConfig struct {
 	MaxPages        int
 	MaxDepth        int
 	Throttle        time.Duration
+	
+	// Advanced Options
+	Intensity       int               // 1-5, controls payload variety and depth
+	CustomPayloads  map[string][]string // ScannerType -> Payloads
+	ScannerOptions  map[string]string   // Arbitrary per-scanner options
 }
 
 // ScanResult holds the results of a complete vulnerability scan

