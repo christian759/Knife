@@ -1,7 +1,8 @@
-package vuln
+package engine
 
 import (
 	"fmt"
+	"knife/modules/vuln/scanners"
 	"sync"
 	"time"
 )
@@ -125,7 +126,7 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 
 // SQL Scanner
 func (sc *ScannerCoordinator) runSQLScanner() error {
-	scanner, err := NewSQLScanner(sc.config.Target, sc.config.Workers, 
+	scanner, err := scanners.NewSQLScanner(sc.config.Target, sc.config.Workers, 
 		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle,
 		sc.config.Intensity, sc.config.CustomPayloads[string(ScannerSQL)])
 	if err != nil {
@@ -145,7 +146,7 @@ func (sc *ScannerCoordinator) runSQLScanner() error {
 
 // Headers Scanner
 func (sc *ScannerCoordinator) runHeadersScanner() error {
-	scanner := NewHeadersScanner(sc.config.Target)
+	scanner := scanners.NewHeadersScanner(sc.config.Target)
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertHeaderFinding(f))
@@ -156,7 +157,7 @@ func (sc *ScannerCoordinator) runHeadersScanner() error {
 
 // Files Scanner
 func (sc *ScannerCoordinator) runFilesScanner() error {
-	scanner := NewFilesScanner(sc.config.Target)
+	scanner := scanners.NewFilesScanner(sc.config.Target)
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertFileFinding(f))
@@ -167,7 +168,7 @@ func (sc *ScannerCoordinator) runFilesScanner() error {
 
 // Network Scanner
 func (sc *ScannerCoordinator) runNetworkScanner() error {
-	scanner := NewNetworkScanner(sc.config.Target, sc.config.Workers, sc.config.Intensity)
+	scanner := scanners.NewNetworkScanner(sc.config.Target, sc.config.Workers, sc.config.Intensity)
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertNetworkFinding(f, sc.config.Target))
@@ -178,14 +179,14 @@ func (sc *ScannerCoordinator) runNetworkScanner() error {
 
 // XSS Scanner
 func (sc *ScannerCoordinator) runXSSScanner() error {
-	scanner, err := newScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, 
+	scanner, err := scanners.NewScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, 
 		sc.config.MaxDepth, sc.config.Intensity, false, sc.config.Throttle,
 		sc.config.CustomPayloads[string(ScannerXSS)])
 	if err != nil {
 		return err
 	}
 	
-	scanner.run()
+	scanner.Run()
 	
 	// Convert findings
 	for _, f := range scanner.Findings {
@@ -198,8 +199,8 @@ func (sc *ScannerCoordinator) runXSSScanner() error {
 
 // CSRF Scanner
 func (sc *ScannerCoordinator) runCSRFScanner() error {
-	scanner, err := NewCSRFScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := scanners.NewCSRFScanner(sc.config.Target, sc.config.Workers, 
+		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs)
 	if err != nil {
 		return err
 	}
@@ -217,7 +218,7 @@ func (sc *ScannerCoordinator) runCSRFScanner() error {
 
 // LFI Scanner
 func (sc *ScannerCoordinator) runLFIScanner() error {
-	scanner, err := NewLFIScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["lfi"])
+	scanner, err := scanners.NewLFIScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["lfi"])
 	if err != nil {
 		return err
 	}
@@ -231,7 +232,7 @@ func (sc *ScannerCoordinator) runLFIScanner() error {
 
 // SSRF Scanner
 func (sc *ScannerCoordinator) runSSRFScanner() error {
-	scanner, err := NewSSRFScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["ssrf"])
+	scanner, err := scanners.NewSSRFScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["ssrf"])
 	if err != nil {
 		return err
 	}
@@ -245,7 +246,7 @@ func (sc *ScannerCoordinator) runSSRFScanner() error {
 
 // Command Injection Scanner
 func (sc *ScannerCoordinator) runCommandInjectionScanner() error {
-	scanner, err := NewCmdInjScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["command_injection"])
+	scanner, err := scanners.NewCmdInjScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["command_injection"])
 	if err != nil {
 		return err
 	}
@@ -259,7 +260,7 @@ func (sc *ScannerCoordinator) runCommandInjectionScanner() error {
 
 // RCE Scanner
 func (sc *ScannerCoordinator) runRCEScanner() error {
-	scanner, err := NewRCEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["rce"])
+	scanner, err := scanners.NewRCEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["rce"])
 	if err != nil {
 		return err
 	}
@@ -273,7 +274,7 @@ func (sc *ScannerCoordinator) runRCEScanner() error {
 
 // Directory Traversal Scanner
 func (sc *ScannerCoordinator) runDirectoryTraversalScanner() error {
-	scanner, err := NewTraversalScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["directory_traversal"])
+	scanner, err := scanners.NewTraversalScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["directory_traversal"])
 	if err != nil {
 		return err
 	}
@@ -287,7 +288,7 @@ func (sc *ScannerCoordinator) runDirectoryTraversalScanner() error {
 
 // XXE Scanner
 func (sc *ScannerCoordinator) runXXEScanner() error {
-	scanner, err := NewXXEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["xxe"])
+	scanner, err := scanners.NewXXEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["xxe"])
 	if err != nil {
 		return err
 	}
@@ -300,8 +301,8 @@ func (sc *ScannerCoordinator) runXXEScanner() error {
 }
 
 // Open Redirect Scanner
-func (sc *ScannerCoordinator) runRedirectScanner() error {
-	scanner, err := NewRedirectScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["open_redirect"])
+func (sc *ScannerCoordinator) runOpenRedirectScanner() error {
+	scanner, err := scanners.NewRedirectScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["open_redirect"])
 	if err != nil {
 		return err
 	}

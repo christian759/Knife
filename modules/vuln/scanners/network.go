@@ -1,4 +1,4 @@
-package vuln
+package scanners
 
 import (
 	"fmt"
