@@ -6,23 +6,29 @@ import (
 
 var (
 	// Colors
-	PrimaryColor   = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#FF6B6B"}
-	SecondaryColor = lipgloss.AdaptiveColor{Light: "#0000FF", Dark: "#4ECDC4"}
-	AccentColor    = lipgloss.AdaptiveColor{Light: "#00FF00", Dark: "#95E1D3"}
-	TextColor      = lipgloss.AdaptiveColor{Light: "#1A1A1A", Dark: "#FAFAFA"}
-	SubtleColor    = lipgloss.AdaptiveColor{Light: "#6C6C6C", Dark: "#888888"}
-	WarningColor   = lipgloss.AdaptiveColor{Light: "#FF9500", Dark: "#FFB84D"}
-	ErrorColor     = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#FF6B6B"}
-	SuccessColor   = lipgloss.AdaptiveColor{Light: "#00C851", Dark: "#4ADE80"}
+	// Colors - Scary Hacker Theme
+	PrimaryColor   = lipgloss.AdaptiveColor{Light: "#D63031", Dark: "#FF0000"} // Blood Red
+	SecondaryColor = lipgloss.AdaptiveColor{Light: "#00B894", Dark: "#00FF41"} // Matrix Green
+	AccentColor    = lipgloss.AdaptiveColor{Light: "#6C5CE7", Dark: "#A29BFE"} // Cyber Purple
+	TextColor      = lipgloss.AdaptiveColor{Light: "#2D3436", Dark: "#F5F6FA"}
+	SubtleColor    = lipgloss.AdaptiveColor{Light: "#636E72", Dark: "#4B4B4B"}
+	WarningColor   = lipgloss.AdaptiveColor{Light: "#E17055", Dark: "#FAB1A0"}
+	ErrorColor     = lipgloss.AdaptiveColor{Light: "#D63031", Dark: "#FF0000"}
+	SuccessColor   = lipgloss.AdaptiveColor{Light: "#00B894", Dark: "#00FF41"}
+	HackerGreen    = lipgloss.Color("#00FF41")
+	BloodRed       = lipgloss.Color("#FF0000")
 
 	// Styles
 	TitleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(PrimaryColor).
+			Foreground(BloodRed).
+			Background(lipgloss.Color("#000000")).
+			Padding(0, 1).
 			MarginBottom(1)
 
 	SubtitleStyle = lipgloss.NewStyle().
-			Foreground(SecondaryColor).
+			Foreground(HackerGreen).
+			Italic(true).
 			MarginBottom(1)
 
 	SelectedItemStyle = lipgloss.NewStyle().
@@ -70,14 +76,28 @@ var (
 				BorderForeground(SubtleColor)
 )
 
-// RenderTitle renders the main title with ASCII art style
+// RenderTitle renders the main title
 func RenderTitle(title string) string {
-	return TitleStyle.Render("🔪 " + title)
+	return TitleStyle.Render(" [!] " + title + " [!] ")
+}
+
+// GetScaryLogo returns ASCII art for the scanner
+func GetScaryLogo() string {
+	logo := `
+  ██╗  ██╗███╗   ██╗██╗███████╗███████╗
+  ██║ ██╔╝████╗  ██║██║██╔════╝██╔════╝
+  █████╔╝ ██╔██╗ ██║██║█████╗  █████╗  
+  ██╔═██╗ ██║╚██╗██║██║██╔══╝  ██╔══╝  
+  ██║  ██╗██║ ╚████║██║██║     ███████╗
+  ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝╚═╝     ╚══════╝
+    > WEB VULNERABILITY TERMINAL <
+`
+	return lipgloss.NewStyle().Foreground(BloodRed).Bold(true).Render(logo)
 }
 
 // RenderSubtitle renders a subtitle
 func RenderSubtitle(subtitle string) string {
-	return SubtitleStyle.Render(subtitle)
+	return SubtitleStyle.Render("> " + subtitle)
 }
 
 // RenderError renders an error message

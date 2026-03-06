@@ -256,26 +256,6 @@ func (s *XSSScanner) postForm(u string, data url.Values, extra map[string]string
 	return resp.StatusCode, string(bodyBytes), mt, nil
 }
 
-// snippet helper
-func snippetAround(body, marker string, r int) string {
-	idx := strings.Index(body, marker)
-	if idx == -1 {
-		if len(body) <= 200 {
-			return body
-		}
-		return body[:200] + "..."
-	}
-	start := idx - r
-	if start < 0 {
-		start = 0
-	}
-	end := idx + len(marker) + r
-	if end > len(body) {
-		end = len(body)
-	}
-	return body[start:end]
-}
-
 // fuzz URL params
 func (s *XSSScanner) fuzzParams(rawurl string) {
 	parsed, err := url.Parse(rawurl)

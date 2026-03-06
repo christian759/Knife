@@ -67,7 +67,7 @@ func (m vulnFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "esc":
 			return m, tea.Quit
 		case "tab", "shift+tab", "enter", "up", "down":
 			s := msg.String()
@@ -115,6 +115,8 @@ func (m vulnFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m vulnFormModel) View() string {
 	var s strings.Builder
+	s.WriteString(tui.GetScaryLogo())
+	s.WriteString("\n\n")
 	s.WriteString(tui.RenderTitle("Website Vulnerability Scanner"))
 	s.WriteString("\n\n")
 	s.WriteString(tui.RenderSubtitle("This tool checks for common web vulnerabilities like XSS, SQLi, LFI, etc."))
@@ -131,7 +133,7 @@ func (m vulnFormModel) View() string {
 		s.WriteString("\n\n")
 	}
 
-	s.WriteString(tui.RenderHelp("tab: next field • enter: submit • q/esc: quit"))
+	s.WriteString(tui.RenderHelp("enter: submit • esc: cancel"))
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
 }
@@ -164,7 +166,7 @@ func (m headerFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "esc":
 			m.canceled = true
 			return m, tea.Quit
 		case "enter":
@@ -193,6 +195,8 @@ func (m headerFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m headerFormModel) View() string {
 	var s strings.Builder
+	s.WriteString(tui.GetScaryLogo())
+	s.WriteString("\n\n")
 	s.WriteString(tui.RenderTitle("Add Custom Headers"))
 	s.WriteString("\n\n")
 	s.WriteString(tui.RenderSubtitle("Enter each header in 'Key: Value' format. Leave blank to finish."))
@@ -212,7 +216,7 @@ func (m headerFormModel) View() string {
 	s.WriteString("\n")
 	s.WriteString(tui.FocusedInputStyle.Render(m.input.View()))
 	s.WriteString("\n\n")
-	s.WriteString(tui.RenderHelp("enter: add header (or finish if empty) • q/esc: cancel"))
+	s.WriteString(tui.RenderHelp("enter: add header (or finish if empty) • esc: cancel"))
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
 }
@@ -244,7 +248,7 @@ func (m cookieFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "esc":
 			m.canceled = true
 			return m, tea.Quit
 		case "enter":
@@ -261,6 +265,8 @@ func (m cookieFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m cookieFormModel) View() string {
 	var s strings.Builder
+	s.WriteString(tui.GetScaryLogo())
+	s.WriteString("\n\n")
 	s.WriteString(tui.RenderTitle("Add Cookies"))
 	s.WriteString("\n\n")
 	s.WriteString(tui.RenderSubtitle("Enter cookies in the format: key1=val1; key2=val2"))
@@ -270,7 +276,7 @@ func (m cookieFormModel) View() string {
 	s.WriteString("\n")
 	s.WriteString(tui.FocusedInputStyle.Render(m.input.View()))
 	s.WriteString("\n\n")
-	s.WriteString(tui.RenderHelp("enter: submit • q/esc: cancel"))
+	s.WriteString(tui.RenderHelp("enter: submit • esc: cancel"))
 
 	return lipgloss.NewStyle().Margin(1, 2).Render(s.String())
 }

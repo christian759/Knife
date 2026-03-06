@@ -164,6 +164,37 @@ func RunAllVulnScanners(target string, headers map[string]string, cookies string
 		fmt.Printf("[!] Open Redirect Scanner error: %v\n", err)
 	}
 
+	// 10. SQL Scanner
+	fmt.Println("[*] Running SQL Scanner...")
+	sqlScanner, err := NewSQLScanner(target, workers, maxPages, maxDepth, throttle)
+	if err == nil {
+		sqlScanner.Run()
+		for _, f := range sqlScanner.Findings {
+			allUnifiedFindings = append(allUnifiedFindings, ConvertSQLFinding(f))
+		}
+		fmt.Printf("[✓] SQL Scanner complete: %d findings\n", len(sqlScanner.Findings))
+	} else {
+		fmt.Printf("[!] SQL Scanner error: %v\n", err)
+	}
+
+	// 11. Security Headers Scanner
+	fmt.Println("[*] Running Headers Scanner...")
+	headersScanner := NewHeadersScanner(target)
+	headersScanner.Run()
+	for _, f := range headersScanner.Findings {
+		allUnifiedFindings = append(allUnifiedFindings, ConvertHeaderFinding(f))
+	}
+	fmt.Printf("[✓] Headers Scanner complete: %d findings\n", len(headersScanner.Findings))
+
+	// 12. Sensitive Files Scanner
+	fmt.Println("[*] Running Files Scanner...")
+	filesScanner := NewFilesScanner(target)
+	filesScanner.Run()
+	for _, f := range filesScanner.Findings {
+		allUnifiedFindings = append(allUnifiedFindings, ConvertFileFinding(f))
+	}
+	fmt.Printf("[✓] Files Scanner complete: %d findings\n", len(filesScanner.Findings))
+
 	fmt.Println()
 	fmt.Printf("[+] Scan complete! Total findings: %d\n", len(allUnifiedFindings))
 

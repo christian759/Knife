@@ -123,11 +123,8 @@ func (s *CSRFScanner) worker(wg *sync.WaitGroup) {
 
 		log.Printf("[CSRF Scan] Visiting %s (Depth: %d)\n", job.URL, job.Depth)
 
-		s.analyzePage(job.URL)
+		s.analyzePage(job.URL, job.Depth)
 
-		if job.Depth < s.MaxDepth {
-			s.crawl(job.URL, job.Depth)
-		}
 		atomic.AddInt32(&s.Active, -1)
 	}
 }
@@ -139,7 +136,7 @@ func (s *CSRFScanner) crawl(u string, depth int) {
 	// Actually, analyzePage fetches, so we can extract links there.
 }
 
-func (s *CSRFScanner) analyzePage(u string) {
+func (s *CSRFScanner) analyzePage(u string, depth int) {
 	if s.Throttle > 0 {
 		time.Sleep(s.Throttle)
 	}
@@ -209,20 +206,18 @@ func (s *CSRFScanner) analyzePage(u string) {
 	})
 
 	// 2. Extract links for crawling
-	doc.Find("a[href]").Each(func(i int, sel *goquery.Selection) {
-		href, exists := sel.Attr("href")
-		if !exists {
-			return
-		}
-		absoluteURL, err := s.normalize(u, href)
-		if err == nil {
-			s.enqueue(absoluteURL, 0) // Depth handled by caller usually, but here we need to pass it.
-			// Refactor: analyzePage should take depth or return links.
-			// For simplicity in this structure, we'll just enqueue here if we had depth passed.
-			// But wait, analyzePage signature is just (u string).
-			// Let's fix the flow.
-		}
-	})
+	if depth < s.MaxDepth {
+		doc.Find("a[href]").Each(func(i int, sel *goquery.Selection) {
+			href, exists := sel.Attr("href")
+			if !exists {
+				return
+			}
+			absoluteURL, err := s.normalize(u, href)
+			if err == nil {
+				s.enqueue(absoluteURL, depth+1)
+			}
+		})
+	}
 }
 
 // Fix: analyzePage needs to handle crawling or we need to separate fetch.
@@ -274,6 +269,9 @@ func (s *CSRFScanner) normalize(base, href string) (string, error) {
 		return "", err
 	}
 	resolved := b.ResolveReference(h)
+	if resolved.Host != s.StartURL.Host {
+		return "", fmt.Errorf("different host")
+	}
 	return resolved.String(), nil
 }
 

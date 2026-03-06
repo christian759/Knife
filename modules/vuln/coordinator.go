@@ -104,9 +104,56 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 		return sc.runXXEScanner()
 	case ScannerOpenRedirect:
 		return sc.runOpenRedirectScanner()
+	case ScannerSQL:
+		return sc.runSQLScanner()
+	case ScannerHeaders:
+		return sc.runHeadersScanner()
+	case ScannerFiles:
+		return sc.runFilesScanner()
 	default:
 		return fmt.Errorf("unknown scanner type: %s", scannerType)
 	}
+}
+
+// SQL Scanner
+func (sc *ScannerCoordinator) runSQLScanner() error {
+	scanner, err := NewSQLScanner(sc.config.Target, sc.config.Workers, 
+		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	if err != nil {
+		return err
+	}
+	
+	scanner.Run()
+	
+	// Convert findings
+	for _, f := range scanner.Findings {
+		sc.addFinding(ConvertSQLFinding(f))
+	}
+	
+	fmt.Printf("[✓] SQL Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
+	return nil
+}
+
+// Headers Scanner
+func (sc *ScannerCoordinator) runHeadersScanner() error {
+	scanner := NewHeadersScanner(sc.config.Target)
+	scanner.Run()
+	for _, f := range scanner.Findings {
+		sc.addFinding(ConvertHeaderFinding(f))
+	}
+	fmt.Printf("[✓] Headers Scanner: Found %d issues\n", len(scanner.Findings))
+	return nil
+}
+
+// Files Scanner
+func (sc *ScannerCoordinator) runFilesScanner() error {
+	scanner := NewFilesScanner(sc.config.Target)
+	scanner.Run()
+	for _, f := range scanner.Findings {
+		sc.addFinding(ConvertFileFinding(f))
+	}
+	fmt.Printf("[✓] Files Scanner: Found %d discoveries\n", len(scanner.Findings))
+	return nil
 }
 
 // XSS Scanner

@@ -56,6 +56,8 @@ const (
 	ScannerDirectoryTraversal ScannerType = "directory_traversal"
 	ScannerXXE               ScannerType = "xxe"
 	ScannerOpenRedirect      ScannerType = "open_redirect"
+	ScannerHeaders           ScannerType = "headers"
+	ScannerFiles             ScannerType = "files"
 )
 
 // ScannerInfo provides metadata about a scanner
@@ -128,6 +130,18 @@ func GetScannerInfo() []ScannerInfo {
 			Name:        "Open Redirect",
 			Description: "Identifies unvalidated redirect vulnerabilities",
 			Severity:    "Medium",
+		},
+		{
+			Type:        ScannerHeaders,
+			Name:        "Security Headers",
+			Description: "Checks for missing or misconfigured HTTP security headers",
+			Severity:    "Low",
+		},
+		{
+			Type:        ScannerFiles,
+			Name:        "Sensitive Files",
+			Description: "Discovers exposed sensitive files and directories",
+			Severity:    "High",
 		},
 	}
 }
@@ -266,6 +280,51 @@ func ConvertXXEFinding(f FindingXXE) UnifiedFinding {
 		Evidence:        f.Evidence,
 		ResponseSnippet: f.ResponseSnippet,
 		RawFinding:      f,
+	}
+}
+
+// ConvertSQLFinding converts FindingSQL to UnifiedFinding
+func ConvertSQLFinding(f FindingSQL) UnifiedFinding {
+	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
+	return UnifiedFinding{
+		Type:            "SQL Injection",
+		Name:            f.Type,
+		URL:             f.URL,
+		Severity:        "High",
+		Timestamp:       timestamp,
+		Param:           f.Param,
+		Payload:         f.Payload,
+		Evidence:        f.Evidence,
+		ResponseSnippet: f.ResponseSnippet,
+		RawFinding:      f,
+	}
+}
+
+// ConvertHeaderFinding converts FindingHeader to UnifiedFinding
+func ConvertHeaderFinding(f FindingHeader) UnifiedFinding {
+	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
+	return UnifiedFinding{
+		Type:      "Security Header",
+		Name:      f.Type,
+		URL:       f.URL,
+		Severity:  "Low",
+		Timestamp: timestamp,
+		Evidence:  f.Evidence,
+		RawFinding: f,
+	}
+}
+
+// ConvertFileFinding converts FindingFile to UnifiedFinding
+func ConvertFileFinding(f FindingFile) UnifiedFinding {
+	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
+	return UnifiedFinding{
+		Type:      "Sensitive File",
+		Name:      f.Type,
+		URL:       f.URL,
+		Severity:  "High",
+		Timestamp: timestamp,
+		Evidence:  f.Evidence,
+		RawFinding: f,
 	}
 }
 

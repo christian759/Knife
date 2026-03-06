@@ -18,6 +18,29 @@ func snippet(s string, n int) string {
 	return s[:n] + "…"
 }
 
+func snippetAround(s, match string, maxLen int) string {
+	loc := strings.Index(s, match)
+	if loc == -1 {
+		return snippet(s, maxLen)
+	}
+	start := loc - maxLen/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + maxLen
+	if end > len(s) {
+		end = len(s)
+	}
+	sn := s[start:end]
+	if start > 0 {
+		sn = "…" + sn
+	}
+	if end < len(s) {
+		sn = sn + "…"
+	}
+	return sn
+}
+
 func findRegexSnippet(re *regexp.Regexp, s string, maxLen int) string {
 	loc := re.FindStringIndex(s)
 	if loc == nil {
@@ -132,6 +155,24 @@ func vulnDetails(name string) VulnInfo {
 			Fix:           "Disable external entity resolution in XML parsers. Avoid parsing untrusted XML input.",
 			Exploitation:  "Attackers can read local files or make network requests from the server by embedding external entities.",
 			Investigation: "Send XML payloads that reference local files (e.g., file:///etc/passwd) or remote servers to detect leaks in the parser response.",
+		}
+	
+	case strings.Contains(n, "header"):
+		return VulnInfo{
+			Severity:      "Low",
+			Description:   "HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser's ability to protect the user.",
+			Fix:           "Configure the web server to send appropriate security headers in all responses.",
+			Exploitation:  "Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.",
+			Investigation: "Use browser developer tools or 'curl -I' to inspect server response headers.",
+		}
+
+	case strings.Contains(n, "file") || strings.Contains(n, "discovery"):
+		return VulnInfo{
+			Severity:      "High",
+			Description:   "Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.",
+			Fix:           "Restrict access to sensitive files using server configuration or move them outside the web root.",
+			Exploitation:  "Attackers can extract database passwords, API keys, or intellectual property.",
+			Investigation: "Attempt to access common sensitive paths directly via the browser.",
 		}
 
 	default:
@@ -322,117 +363,126 @@ func WriteUnifiedReport(findings []UnifiedFinding, filename string, target strin
 		<style>
 			* { margin: 0; padding: 0; box-sizing: border-box; }
 			body { 
-				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				font-family: 'Courier New', Courier, monospace; 
+				background: #0d0208;
+				color: #00ff41;
 				padding: 20px;
 				min-height: 100vh;
 			}
 			.container {
 				max-width: 1200px;
 				margin: 0 auto;
-				background: #fff;
-				border-radius: 16px;
-				box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+				background: #000;
+				border: 1px solid #00ff41;
+				border-radius: 4px;
+				box-shadow: 0 0 20px #00ff4155;
 				overflow: hidden;
 			}
 			.header {
-				background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-				color: #fff;
+				background: #000;
+				border-bottom: 2px solid #ff0000;
+				color: #ff0000;
 				padding: 40px;
 				text-align: center;
+				text-transform: uppercase;
+				letter-spacing: 4px;
 			}
-			.header h1 { font-size: 2.5em; margin-bottom: 10px; }
-			.header p { opacity: 0.9; font-size: 1.1em; }
+			.header h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 0 0 10px #ff000055; }
+			.header p { opacity: 0.9; font-size: 1.1em; color: #00ff41; }
 			.summary {
 				display: grid;
 				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 				gap: 20px;
 				padding: 30px 40px;
-				background: #f8f9fa;
-				border-bottom: 3px solid #e9ecef;
+				background: #050505;
+				border-bottom: 1px solid #00ff41;
 			}
 			.summary-card {
-				background: #fff;
+				background: #000;
 				padding: 20px;
-				border-radius: 12px;
-				box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+				border: 1px solid #00ff41;
+				border-radius: 4px;
 				text-align: center;
-				transition: transform 0.2s;
+				transition: all 0.2s;
 			}
-			.summary-card:hover { transform: translateY(-5px); }
-			.summary-card h3 { font-size: 2em; margin-bottom: 5px; }
-			.summary-card p { color: #666; font-size: 0.9em; }
-			.critical { color: #d63031; border-left: 4px solid #d63031; }
-			.high { color: #e67e22; border-left: 4px solid #e67e22; }
-			.medium { color: #f1c40f; border-left: 4px solid #f1c40f; }
-			.low { color: #3498db; border-left: 4px solid #3498db; }
+			.summary-card:hover { border-color: #ff0000; box-shadow: 0 0 10px #ff000055; }
+			.summary-card h3 { font-size: 2.5em; margin-bottom: 5px; }
+			.summary-card p { color: #00ff41; font-size: 0.9em; text-transform: uppercase; }
+			.critical { color: #ff0000; border-color: #ff0000 !important; }
+			.high { color: #e67e22; }
+			.medium { color: #f1c40f; }
+			.low { color: #3498db; }
 			.findings {
 				padding: 40px;
 			}
 			.finding-card {
-				background: #fff;
-				border-radius: 12px;
+				background: #050505;
+				border: 1px solid #00ff41;
 				padding: 25px;
-				margin-bottom: 25px;
-				border-left: 6px solid #ccc;
-				box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+				margin-bottom: 30px;
+				box-shadow: 5px 5px 0px #00ff4122;
 			}
-			.finding-card.severity-Critical { border-left-color: #d63031; }
-			.finding-card.severity-High { border-left-color: #e67e22; }
-			.finding-card.severity-Medium { border-left-color: #f1c40f; }
-			.finding-card.severity-Low { border-left-color: #3498db; }
+			.finding-card.severity-Critical { border-color: #ff0000; box-shadow: 5px 5px 0px #ff000022; }
+			.finding-card.severity-High { border-color: #e67e22; }
+			.finding-card.severity-Medium { border-color: #f1c40f; }
+			.finding-card.severity-Low { border-color: #3498db; }
 			.finding-header {
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				margin-bottom: 15px;
+				margin-bottom: 20px;
+				border-bottom: 1px solid #333;
+				padding-bottom: 10px;
 			}
-			.finding-title { font-size: 1.5em; color: #2c3e50; }
+			.finding-title { font-size: 1.6em; color: #ff0000; font-weight: bold; }
 			.severity-badge {
-				padding: 6px 16px;
-				border-radius: 20px;
+				padding: 4px 12px;
+				border-radius: 2px;
 				font-weight: bold;
-				font-size: 0.9em;
-				color: #fff;
+				font-size: 0.8em;
+				text-transform: uppercase;
+				border: 1px solid;
 			}
-			.severity-badge.Critical { background: #d63031; }
-			.severity-badge.High { background: #e67e22; }
-			.severity-badge.Medium { background: #f1c40f; color: #333; }
-			.severity-badge.Low { background: #3498db; }
-			.finding-details { margin: 15px 0; }
+			.severity-badge.Critical { color: #ff0000; border-color: #ff0000; }
+			.severity-badge.High { color: #e67e22; border-color: #e67e22; }
+			.severity-badge.Medium { color: #f1c40f; border-color: #f1c40f; }
+			.severity-badge.Low { color: #3498db; border-color: #3498db; }
+			.finding-details { margin: 15px 0; font-size: 0.95em; }
 			.detail-row {
 				display: grid;
-				grid-template-columns: 150px 1fr;
-				padding: 8px 0;
-				border-bottom: 1px solid #ecf0f1;
+				grid-template-columns: 200px 1fr;
+				padding: 10px 0;
+				border-bottom: 1px solid #111;
 			}
-			.detail-label { font-weight: bold; color: #7f8c8d; }
-			.detail-value { color: #2c3e50; word-break: break-all; }
+			.detail-label { font-weight: bold; color: #00ff41; opacity: 0.7; text-transform: uppercase; }
+			.detail-value { color: #00ff41; word-break: break-all; }
 			.evidence {
-				background: #eef1f6;
-				border-radius: 8px;
+				background: #000;
+				border: 1px dashed #00ff41;
 				padding: 15px;
 				font-family: 'Courier New', monospace;
 				white-space: pre-wrap;
 				overflow-x: auto;
 				margin-top: 15px;
 				font-size: 0.9em;
+				color: #00ff41;
 			}
 			.section-title {
-				font-size: 1.3em;
-				color: #2c3e50;
-				margin-bottom: 10px;
-				padding-bottom: 10px;
-				border-bottom: 2px solid #3498db;
+				font-size: 1.1em;
+				color: #ff0000;
+				margin-bottom: 8px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
 			}
 			footer {
 				text-align: center;
-				padding: 30px;
-				background: #f8f9fa;
-				color: #666;
-				font-size: 0.9em;
+				padding: 40px;
+				background: #050505;
+				color: #444;
+				font-size: 0.8em;
+				border-top: 1px solid #111;
 			}
-			.timestamp { color: #95a5a6; font-size: 0.85em; margin-top: 10px; }
+			.timestamp { color: #333; }
 		</style>
 	</head>
 	<body>
