@@ -271,10 +271,10 @@ func (s *XSSScanner) fuzzParams(rawurl string) {
 		return
 	}
 	payloads := s.PayloadsBasic
-	if s.Intensity == "full" {
+	if s.Intensity >= 4 {
 		payloads = s.PayloadsFull
 	}
-	if s.Intensity == "both" {
+	if s.Intensity >= 3 {
 		payloads = append(payloads, s.PayloadsFull...)
 	}
 	// limit per param for speed
@@ -284,7 +284,7 @@ func (s *XSSScanner) fuzzParams(rawurl string) {
 		}
 		for i, p := range payloads {
 			// throttle number of payloads in basic mode
-			if s.Intensity == "basic" && i > 6 {
+			if s.Intensity <= 2 && i > 6 {
 				break
 			}
 			marker := makeMarker()
@@ -341,10 +341,10 @@ func (s *XSSScanner) fuzzForms(pageURL, body string) {
 		return
 	}
 	payloads := s.PayloadsBasic
-	if s.Intensity == "full" {
+	if s.Intensity >= 4 {
 		payloads = s.PayloadsFull
 	}
-	if s.Intensity == "both" {
+	if s.Intensity >= 3 {
 		payloads = append(payloads, s.PayloadsFull...)
 	}
 
@@ -379,7 +379,7 @@ func (s *XSSScanner) fuzzForms(pageURL, body string) {
 		for name := range data {
 			orig := data[name]
 			for i, p := range payloads {
-				if s.Intensity == "basic" && i > 6 {
+				if s.Intensity <= 2 && i > 6 {
 					break
 				}
 				marker := makeMarker()
@@ -479,7 +479,7 @@ func (s *XSSScanner) domCheck(u string) {
 	}
 	// look for payload fragments
 	payloads := s.PayloadsBasic
-	if s.Intensity == "full" {
+	if s.Intensity >= 4 {
 		payloads = s.PayloadsFull
 	}
 	for _, p := range payloads {

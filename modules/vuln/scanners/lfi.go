@@ -402,7 +402,7 @@ func (s *LFIScanner) normalize(base, href string) (string, error) {
 func RunLFIScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting LFI Scanner on", target)
 
-	scanner, err := NewLFIScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewLFIScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
 	if err != nil {
 		return err
 	}

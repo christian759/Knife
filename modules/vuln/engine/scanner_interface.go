@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"knife/modules/vuln/db"
+	"knife/modules/vuln/scanners"
 )
 
 // UnifiedFinding represents a vulnerability finding from any scanner
@@ -153,8 +154,8 @@ func GetScannerInfo() []ScannerInfo {
 	}
 }
 
-// ConvertXSSFinding converts FindingXSS to UnifiedFinding
-func ConvertXSSFinding(f FindingXSS) UnifiedFinding {
+// ConvertXSSFinding converts scanners.FindingXSS to UnifiedFinding
+func ConvertXSSFinding(f scanners.FindingXSS) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "XSS",
@@ -171,8 +172,8 @@ func ConvertXSSFinding(f FindingXSS) UnifiedFinding {
 	}
 }
 
-// ConvertCSRFFinding converts FindingCSRF to UnifiedFinding
-func ConvertCSRFFinding(f FindingCSRF) UnifiedFinding {
+// ConvertCSRFFinding converts scanners.FindingCSRF to UnifiedFinding
+func ConvertCSRFFinding(f scanners.FindingCSRF) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:         "CSRF",
@@ -188,8 +189,8 @@ func ConvertCSRFFinding(f FindingCSRF) UnifiedFinding {
 	}
 }
 
-// ConvertLFIFinding converts FindingLFI to UnifiedFinding
-func ConvertLFIFinding(f FindingLFI) UnifiedFinding {
+// ConvertLFIFinding converts scanners.FindingLFI to UnifiedFinding
+func ConvertLFIFinding(f scanners.FindingLFI) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "LFI",
@@ -205,8 +206,8 @@ func ConvertLFIFinding(f FindingLFI) UnifiedFinding {
 	}
 }
 
-// ConvertSSRFFinding converts FindingSSRF to UnifiedFinding
-func ConvertSSRFFinding(f FindingSSRF) UnifiedFinding {
+// ConvertSSRFFinding converts scanners.FindingSSRF to UnifiedFinding
+func ConvertSSRFFinding(f scanners.FindingSSRF) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "SSRF",
@@ -222,8 +223,8 @@ func ConvertSSRFFinding(f FindingSSRF) UnifiedFinding {
 	}
 }
 
-// ConvertCmdInjFinding converts FindingCmdInj to UnifiedFinding
-func ConvertCmdInjFinding(f FindingCmdInj) UnifiedFinding {
+// ConvertCmdInjFinding converts scanners.FindingCmdInj to UnifiedFinding
+func ConvertCmdInjFinding(f scanners.FindingCmdInj) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "Command Injection",
@@ -239,8 +240,8 @@ func ConvertCmdInjFinding(f FindingCmdInj) UnifiedFinding {
 	}
 }
 
-// ConvertRCEFinding converts FindingRCE to UnifiedFinding
-func ConvertRCEFinding(f FindingRCE) UnifiedFinding {
+// ConvertRCEFinding converts scanners.FindingRCE to UnifiedFinding
+func ConvertRCEFinding(f scanners.FindingRCE) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "RCE",
@@ -256,8 +257,8 @@ func ConvertRCEFinding(f FindingRCE) UnifiedFinding {
 	}
 }
 
-// ConvertTraversalFinding converts FindingTraversal to UnifiedFinding
-func ConvertTraversalFinding(f FindingTraversal) UnifiedFinding {
+// ConvertTraversalFinding converts scanners.FindingTraversal to UnifiedFinding
+func ConvertTraversalFinding(f scanners.FindingTraversal) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "Directory Traversal",
@@ -273,8 +274,8 @@ func ConvertTraversalFinding(f FindingTraversal) UnifiedFinding {
 	}
 }
 
-// ConvertXXEFinding converts FindingXXE to UnifiedFinding
-func ConvertXXEFinding(f FindingXXE) UnifiedFinding {
+// ConvertXXEFinding converts scanners.FindingXXE to UnifiedFinding
+func ConvertXXEFinding(f scanners.FindingXXE) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "XXE",
@@ -290,8 +291,8 @@ func ConvertXXEFinding(f FindingXXE) UnifiedFinding {
 	}
 }
 
-// ConvertSQLFinding converts FindingSQL to UnifiedFinding
-func ConvertSQLFinding(f FindingSQL) UnifiedFinding {
+// ConvertSQLFinding converts scanners.FindingSQL to UnifiedFinding
+func ConvertSQLFinding(f scanners.FindingSQL) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:            "SQL Injection",
@@ -307,8 +308,8 @@ func ConvertSQLFinding(f FindingSQL) UnifiedFinding {
 	}
 }
 
-// ConvertHeaderFinding converts FindingHeader to UnifiedFinding
-func ConvertHeaderFinding(f FindingHeader) UnifiedFinding {
+// ConvertHeaderFinding converts scanners.FindingHeader to UnifiedFinding
+func ConvertHeaderFinding(f scanners.FindingHeader) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:      "Security Header",
@@ -321,8 +322,8 @@ func ConvertHeaderFinding(f FindingHeader) UnifiedFinding {
 	}
 }
 
-// ConvertFileFinding converts FindingFile to UnifiedFinding
-func ConvertFileFinding(f FindingFile) UnifiedFinding {
+// ConvertFileFinding converts scanners.FindingFile to UnifiedFinding
+func ConvertFileFinding(f scanners.FindingFile) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:      "Sensitive File",
@@ -335,8 +336,8 @@ func ConvertFileFinding(f FindingFile) UnifiedFinding {
 	}
 }
 
-// ConvertRedirectFinding converts FindingRedirect to UnifiedFinding
-func ConvertRedirectFinding(f FindingRedirect) UnifiedFinding {
+// ConvertRedirectFinding converts scanners.FindingRedirect to UnifiedFinding
+func ConvertRedirectFinding(f scanners.FindingRedirect) UnifiedFinding {
 	timestamp, _ := time.Parse(time.RFC3339, f.Timestamp)
 	return UnifiedFinding{
 		Type:       "Open Redirect",
@@ -352,7 +353,7 @@ func ConvertRedirectFinding(f FindingRedirect) UnifiedFinding {
 }
 
 // ConvertNetworkFinding converts NetworkFinding to UnifiedFinding
-func ConvertNetworkFinding(f NetworkFinding, target string) UnifiedFinding {
+func ConvertNetworkFinding(f scanners.NetworkFinding, target string) UnifiedFinding {
 	return UnifiedFinding{
 		Type:            "Network Service",
 		Name:            fmt.Sprintf("Open Port: %d (%s)", f.Port, f.Service),

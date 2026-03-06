@@ -182,7 +182,7 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 		return
 	}
 
-	for param, values := range query {
+	for param, _ := range query {
 		for _, payload := range s.Payloads {
 			if s.Throttle > 0 {
 				time.Sleep(s.Throttle)
@@ -372,7 +372,7 @@ func (s *RCEScanner) normalize(base, href string) (string, error) {
 func RunRCEScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting RCE Scanner on", target)
 
-	scanner, err := NewRCEScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewRCEScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
 	if err != nil {
 		return err
 	}

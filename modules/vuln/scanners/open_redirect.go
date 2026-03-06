@@ -359,7 +359,7 @@ func (s *RedirectScanner) normalize(base, href string) (string, error) {
 func RunRedirectScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Open Redirect Scanner on", target)
 
-	scanner, err := NewRedirectScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewRedirectScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
 	if err != nil {
 		return err
 	}

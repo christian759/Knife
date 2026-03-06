@@ -343,7 +343,7 @@ func (s *TraversalScanner) normalize(base, href string) (string, error) {
 func RunTraversalScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Directory Traversal Scanner on", target)
 
-	scanner, err := NewTraversalScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewTraversalScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
 	if err != nil {
 		return err
 	}
