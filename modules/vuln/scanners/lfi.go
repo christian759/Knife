@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- LFI Scanner Implementation ---
@@ -285,7 +286,7 @@ func generateLFIPayloads(intensity int, targetedCVEs []string, customPayloads []
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerLFI {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerLFI {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}

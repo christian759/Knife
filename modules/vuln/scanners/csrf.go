@@ -298,7 +298,7 @@ func (s *CSRFScanner) normalize(base, href string) (string, error) {
 func RunCSRFScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting CSRF Scanner on", target)
 
-	scanner, err := NewCSRFScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewCSRFScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil)
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- Open Redirect Scanner Implementation ---
@@ -269,7 +270,7 @@ func generateRedirectPayloads(intensity int, targetedCVEs []string, customPayloa
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerOpenRedirect {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerOpenRedirect {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}

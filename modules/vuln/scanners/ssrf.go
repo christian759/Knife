@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- SSRF Scanner Implementation ---
@@ -258,7 +259,7 @@ func generateSSRFPayloads(intensity int, targetedCVEs []string, customPayloads [
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerSSRF {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerSSRF {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}

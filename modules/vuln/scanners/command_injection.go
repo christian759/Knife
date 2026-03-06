@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- Command Injection Scanner Implementation ---
@@ -181,7 +182,7 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 		return
 	}
 
-	for param, values := range query {
+	for param, _ := range query {
 		for _, payload := range s.Payloads {
 			if s.Throttle > 0 {
 				time.Sleep(s.Throttle)
@@ -272,7 +273,7 @@ func generateCmdInjPayloads(intensity int, targetedCVEs []string, customPayloads
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerCommandInjection {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerCommandInjection {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}
@@ -369,7 +370,7 @@ func (s *CmdInjScanner) normalize(base, href string) (string, error) {
 func RunCmdInjScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Command Injection Scanner on", target)
 
-	scanner, err := NewCmdInjScanner(target, 10, 100, 3, 200*time.Millisecond)
+	scanner, err := NewCmdInjScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
 	if err != nil {
 		return err
 	}

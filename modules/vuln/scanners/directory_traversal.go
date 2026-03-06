@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- Directory Traversal Scanner Implementation ---
@@ -253,7 +254,7 @@ func generateTraversalPayloads(intensity int, targetedCVEs []string, customPaylo
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerDirectoryTraversal {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerDirectoryTraversal {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}

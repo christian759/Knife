@@ -139,14 +139,3 @@ func (ns *NetworkScanner) getServiceName(port int) string {
 	}
 }
 
-// ConvertNetworkFinding converts NetworkFinding to UnifiedFinding
-func ConvertNetworkFinding(f NetworkFinding, target string) UnifiedFinding {
-	return UnifiedFinding{
-		Type:      "Network Service",
-		Name:      fmt.Sprintf("Open Port: %d (%s)", f.Port, f.Service),
-		URL:       target,
-		Severity:  "Medium",
-		Timestamp: time.Now(),
-		Evidence:  fmt.Sprintf("Status: %s, Banner: %s", f.State, f.Banner),
-	}
-}

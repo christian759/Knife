@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"knife/modules/vuln/db"
 )
 
 // --- XXE Scanner Implementation ---
@@ -286,7 +287,7 @@ func generateXXEPayloads(intensity int, targetedCVEs []string, customPayloads []
 
 	// CVE-specific payloads
 	for _, id := range targetedCVEs {
-		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerXXE {
+		if cve, ok := db.GetCVEDatabase()[id]; ok && cve.Type == db.ScannerXXE {
 			payloads = append(payloads, cve.Payloads...)
 		}
 	}
