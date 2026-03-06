@@ -1,7 +1,22 @@
 package db
 
-import (
-	"time"
+// ScannerType represents the type of vulnerability scanner
+type ScannerType string
+
+const (
+	ScannerXSS               ScannerType = "xss"
+	ScannerCSRF              ScannerType = "csrf"
+	ScannerSQL               ScannerType = "sql"
+	ScannerLFI               ScannerType = "lfi"
+	ScannerSSRF              ScannerType = "ssrf"
+	ScannerCommandInjection  ScannerType = "command_injection"
+	ScannerRCE               ScannerType = "rce"
+	ScannerDirectoryTraversal ScannerType = "directory_traversal"
+	ScannerXXE               ScannerType = "xxe"
+	ScannerOpenRedirect      ScannerType = "open_redirect"
+	ScannerHeaders           ScannerType = "headers"
+	ScannerFiles             ScannerType = "files"
+	ScannerNetwork           ScannerType = "network"
 )
 
 // CVEMetadata represents information about a specific CVE

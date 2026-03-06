@@ -12,8 +12,17 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"knife/modules/vuln/engine"
 	"knife/tui"
 )
+
+// vulnFormField represents a configuration form field
+type vulnFormField struct {
+	label       string
+	placeholder string
+	value       string
+	input       textinput.Model
+}
 
 type vulnSessionState int
 
@@ -26,7 +35,7 @@ const (
 )
 
 type scannerItem struct {
-	info     ScannerInfo
+	info     engine.ScannerInfo
 	selected bool
 }
 
@@ -49,8 +58,8 @@ type mainModel struct {
 	
 	// Data
 	targetURL      string
-	availableScanners []ScannerInfo
-	selected      map[ScannerType]bool
+	availableScanners []engine.ScannerInfo
+	selected      map[engine.ScannerType]bool
 	
 	// Scan settings
 	workers        int
@@ -58,9 +67,9 @@ type mainModel struct {
 	depth          int
 	
 	// Execution
-	coordinator    *ScannerCoordinator
-	results        *ScanResult
-	progressMsg    ScanProgress
+	coordinator    *engine.ScannerCoordinator
+	results        *engine.ScanResult
+	progressMsg    engine.ScanProgress
 	err            error
 	done           bool
 }
@@ -74,7 +83,7 @@ func initialModel() mainModel {
 	ti.Width = 60
 
 	// Scanner list
-	scanners := GetScannerInfo()
+	scanners := engine.GetScannerInfo()
 	items := make([]list.Item, len(scanners))
 	for i, s := range scanners {
 		items[i] = scannerItem{info: s, selected: true} // Default all on
@@ -102,7 +111,7 @@ func initialModel() mainModel {
 		configFields[i].input = cti
 	}
 
-	selected := make(map[ScannerType]bool)
+	selected := make(map[engine.ScannerType]bool)
 	for _, s := range scanners {
 		selected[s.Type] = true
 	}
@@ -125,9 +134,9 @@ func (m mainModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-type scanProgressMsg ScanProgress
+type scanProgressMsg engine.ScanProgress
 type scanFinishedMsg struct {
-	result *ScanResult
+	result *engine.ScanResult
 	err    error
 }
 
@@ -145,16 +154,12 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case scanProgressMsg:
-		m.progressMsg = ScanProgress(msg)
+		m.progressMsg = engine.ScanProgress(msg)
 		// Update progress bar based on completed scanners
 		if m.coordinator != nil {
-			completed := 0
-			for _, res := range m.coordinator.scannerResults {
-				if res.Status == "completed" || res.Status == "failed" {
-					completed++
-				}
-			}
-			total := len(m.config.EnabledScanners)
+			summary := m.coordinator.GetSummary()
+			completed := summary["Total"]
+			total := len(m.selected)
 			if total > 0 {
 				return m, m.progress.SetPercent(float64(completed) / float64(total))
 			}
@@ -270,14 +275,14 @@ func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 	m.state = stateScanning
 	
-	enabled := []ScannerType{}
+	enabled := []engine.ScannerType{}
 	for st, sel := range m.selected {
 		if sel {
 			enabled = append(enabled, st)
 		}
 	}
 
-	config := ScanConfig{
+	config := engine.ScanConfig{
 		Target:          m.targetURL,
 		EnabledScanners: enabled,
 		Workers:         m.workers,
@@ -288,7 +293,7 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 		CustomPayloads:  make(map[string][]string),
 	}
 
-	m.coordinator = NewScannerCoordinator(config)
+	m.coordinator = engine.NewScannerCoordinator(config)
 
 	// Background scan function
 	runScan := func() tea.Msg {

@@ -1,6 +1,11 @@
 package engine
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"knife/modules/vuln/db"
+)
 
 // UnifiedFinding represents a vulnerability finding from any scanner
 // This provides a common structure for reporting all vulnerability types
@@ -43,23 +48,23 @@ type ScanProgress struct {
 	Error          error
 }
 
-// ScannerType represents the type of vulnerability scanner
-type ScannerType string
+// ScannerType is an alias for db.ScannerType
+type ScannerType = db.ScannerType
 
 const (
-	ScannerXSS               ScannerType = "xss"
-	ScannerCSRF              ScannerType = "csrf"
-	ScannerSQL               ScannerType = "sql"
-	ScannerLFI               ScannerType = "lfi"
-	ScannerSSRF              ScannerType = "ssrf"
-	ScannerCommandInjection  ScannerType = "command_injection"
-	ScannerRCE               ScannerType = "rce"
-	ScannerDirectoryTraversal ScannerType = "directory_traversal"
-	ScannerXXE               ScannerType = "xxe"
-	ScannerOpenRedirect      ScannerType = "open_redirect"
-	ScannerHeaders           ScannerType = "headers"
-	ScannerFiles             ScannerType = "files"
-	ScannerNetwork           ScannerType = "network"
+	ScannerXSS               = db.ScannerXSS
+	ScannerCSRF              = db.ScannerCSRF
+	ScannerSQL               = db.ScannerSQL
+	ScannerLFI               = db.ScannerLFI
+	ScannerSSRF              = db.ScannerSSRF
+	ScannerCommandInjection  = db.ScannerCommandInjection
+	ScannerRCE               = db.ScannerRCE
+	ScannerDirectoryTraversal = db.ScannerDirectoryTraversal
+	ScannerXXE               = db.ScannerXXE
+	ScannerOpenRedirect      = db.ScannerOpenRedirect
+	ScannerHeaders           = db.ScannerHeaders
+	ScannerFiles             = db.ScannerFiles
+	ScannerNetwork           = db.ScannerNetwork
 )
 
 // ScannerInfo provides metadata about a scanner
