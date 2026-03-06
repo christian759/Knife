@@ -44,6 +44,7 @@ A modern, terminal-based penetration testing toolkit built with Go and [Bubble T
 - **Network Exposure Focus**: Detects exposed web/network services and potential privilege-escalation paths
 - **Separate Network Modes**: Run network scanning as `infrastructure` (default), `web`, or `hybrid` profiles
 - **Server-Grade Fingerprinting**: Multi-IP host resolution with protocol-level probes (HTTP/TLS/SSH/SMTP/MySQL/PostgreSQL/Redis)
+- **Version-to-CVE Hinting**: Maps detected service/version banners to probable CVE signatures for rapid triage
 - **14 Vulnerability Scanners**: Comprehensive automated testing for:
   - Cross-Site Scripting (XSS)
   - SQL Injection (SQLi)

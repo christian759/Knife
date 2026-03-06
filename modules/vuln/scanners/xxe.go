@@ -31,23 +31,23 @@ type FindingXXE struct {
 
 // XXEScanner holds the state for the XXE scan
 type XXEScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan xxeCrawlJob
-	Findings    []FindingXXE
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32 // Added Active field
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Payloads    []string
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan xxeCrawlJob
+	Findings     []FindingXXE
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32 // Added Active field
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Payloads     []string
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // xxeCrawlJob represents a URL to be scanned
@@ -316,7 +316,7 @@ func generateXXEPayloads(intensity int, targetedCVEs []string, customPayloads []
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeBodyPayloads(payloads, intensity)
 }
 
 func (s *XXEScanner) markVisited(u string) bool {
@@ -350,6 +350,12 @@ func (s *XXEScanner) enqueue(u string, depth int) {
 func (s *XXEScanner) addFinding(f FindingXXE) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] XXE FOUND: %s (Param: %s)\n", f.URL, f.Param)

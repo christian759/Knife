@@ -386,6 +386,9 @@ func ConvertNetworkFinding(f scanners.NetworkFinding, target string) UnifiedFind
 	if f.Category != "" {
 		evidence += fmt.Sprintf(" category=%s", f.Category)
 	}
+	if len(f.CVEHints) > 0 {
+		evidence += fmt.Sprintf(" cve_hints=%s", strings.Join(f.CVEHints, " ; "))
+	}
 
 	severity := "Medium"
 	switch {
@@ -408,6 +411,7 @@ func ConvertNetworkFinding(f scanners.NetworkFinding, target string) UnifiedFind
 		URL:        url,
 		Severity:   severity,
 		Timestamp:  time.Now(),
+		CVE:        f.PrimaryCVE,
 		Evidence:   evidence,
 		RawFinding: f,
 	}

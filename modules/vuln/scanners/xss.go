@@ -155,6 +155,12 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity int, us
 func (s *XSSScanner) addFinding(f FindingXSS) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Payload, f.Context)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Payload, existing.Context) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[FINDING] %s %s\n", f.Type, f.URL)

@@ -28,23 +28,23 @@ type FindingRedirect struct {
 
 // RedirectScanner holds the state for the Open Redirect scan
 type RedirectScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan redirectCrawlJob
-	Findings    []FindingRedirect
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan redirectCrawlJob
+	Findings     []FindingRedirect
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Intensity    int
 	TargetedCVEs []string
-	Payloads    []string
-	Throttle    time.Duration
+	Payloads     []string
+	Throttle     time.Duration
 }
 
 // redirectCrawlJob represents a URL to be scanned
@@ -304,7 +304,7 @@ func generateRedirectPayloads(intensity int, targetedCVEs []string, customPayloa
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeQueryPayloads(payloads, intensity)
 }
 
 func (s *RedirectScanner) markVisited(u string) bool {
@@ -338,6 +338,12 @@ func (s *RedirectScanner) enqueue(u string, depth int) {
 func (s *RedirectScanner) addFinding(f FindingRedirect) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.RedirectLocation)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.RedirectLocation) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] OPEN REDIRECT FOUND: %s -> %s\n", f.URL, f.RedirectLocation)

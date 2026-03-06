@@ -31,23 +31,23 @@ type FindingSSRF struct {
 
 // SSRFScanner holds the state for the SSRF scan
 type SSRFScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan ssrfCrawlJob
-	Findings    []FindingSSRF
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Payloads    []string
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan ssrfCrawlJob
+	Findings     []FindingSSRF
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Payloads     []string
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // ssrfCrawlJob represents a URL to be scanned
@@ -297,7 +297,7 @@ func generateSSRFPayloads(intensity int, targetedCVEs []string, customPayloads [
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeQueryPayloads(payloads, intensity)
 }
 
 func (s *SSRFScanner) markVisited(u string) bool {
@@ -331,6 +331,12 @@ func (s *SSRFScanner) enqueue(u string, depth int) {
 func (s *SSRFScanner) addFinding(f FindingSSRF) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] SSRF FOUND: %s (Param: %s)\n", f.URL, f.Param)

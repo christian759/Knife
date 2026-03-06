@@ -16,17 +16,19 @@ import (
 
 // NetworkFinding represents a discovered open port or service
 type NetworkFinding struct {
-	Port           int    `json:"port"`
-	Service        string `json:"service"`
-	State          string `json:"state"`
-	Endpoint       string `json:"endpoint"`
-	Protocol       string `json:"protocol,omitempty"`
-	Banner         string `json:"banner,omitempty"`
-	Category       string `json:"category,omitempty"`
-	PrivEscPath    bool   `json:"priv_esc_path,omitempty"`
-	Risk           string `json:"risk,omitempty"`
-	Recommendation string `json:"recommendation,omitempty"`
-	Proof          string `json:"proof,omitempty"`
+	Port           int      `json:"port"`
+	Service        string   `json:"service"`
+	State          string   `json:"state"`
+	Endpoint       string   `json:"endpoint"`
+	Protocol       string   `json:"protocol,omitempty"`
+	Banner         string   `json:"banner,omitempty"`
+	Category       string   `json:"category,omitempty"`
+	PrivEscPath    bool     `json:"priv_esc_path,omitempty"`
+	Risk           string   `json:"risk,omitempty"`
+	Recommendation string   `json:"recommendation,omitempty"`
+	Proof          string   `json:"proof,omitempty"`
+	PrimaryCVE     string   `json:"primary_cve,omitempty"`
+	CVEHints       []string `json:"cve_hints,omitempty"`
 }
 
 // NetworkScanner performs port and service discovery
@@ -47,6 +49,66 @@ type NetworkScanOptions struct {
 	Timeout  time.Duration // optional, default 2s
 	Workers  int           // optional, falls back to constructor workers
 	DeepScan bool          // if true, expand to broader nmap-like top range
+}
+
+type networkCVEHintRule struct {
+	ID             string
+	Title          string
+	Severity       string
+	MatchAll       []string
+	Recommendation string
+}
+
+var networkCVEHintRules = []networkCVEHintRule{
+	{
+		ID:             "CVE-2021-41773",
+		Title:          "Apache HTTP Server Path Traversal / RCE",
+		Severity:       "Critical",
+		MatchAll:       []string{"apache/2.4.49"},
+		Recommendation: "Upgrade Apache HTTP Server to a patched release immediately and validate traversal/RCE protections.",
+	},
+	{
+		ID:             "CVE-2021-42013",
+		Title:          "Apache HTTP Server Path Traversal / RCE (incomplete previous fix)",
+		Severity:       "Critical",
+		MatchAll:       []string{"apache/2.4.50"},
+		Recommendation: "Upgrade Apache HTTP Server to a patched release immediately and verify risky modules are disabled.",
+	},
+	{
+		ID:             "CVE-2011-2523",
+		Title:          "vsFTPd Backdoor in 2.3.4",
+		Severity:       "Critical",
+		MatchAll:       []string{"vsftpd", "2.3.4"},
+		Recommendation: "Replace vulnerable FTP service version and verify host integrity due to known backdoor risk.",
+	},
+	{
+		ID:             "CVE-2016-6210",
+		Title:          "OpenSSH User Enumeration Timing Leak",
+		Severity:       "Medium",
+		MatchAll:       []string{"openssh_7.2p2"},
+		Recommendation: "Upgrade OpenSSH and reduce login metadata leakage (rate limits, monitoring, account lockout).",
+	},
+	{
+		ID:             "CVE-2019-10149",
+		Title:          "Exim Remote Command Execution (Return of the WIZard)",
+		Severity:       "Critical",
+		MatchAll:       []string{"exim", "4.87"},
+		Recommendation: "Upgrade Exim to patched versions and limit exposed SMTP attack surface.",
+	},
+	{
+		ID:             "CVE-2020-14882",
+		Title:          "Oracle WebLogic Unauthenticated Console RCE",
+		Severity:       "Critical",
+		MatchAll:       []string{"weblogic", "12.2.1.4"},
+		Recommendation: "Patch WebLogic immediately and restrict admin endpoints with strong network ACLs.",
+	},
+	{
+		ID:             "CVE-2017-10271",
+		Title:          "Oracle WebLogic XMLDecoder RCE",
+		Severity:       "Critical",
+		MatchAll:       []string{"weblogic", "10.3.6"},
+		Recommendation: "Patch WebLogic and block vulnerable SOAP endpoints until remediation is complete.",
+	},
 }
 
 // NewNetworkScanner creates a new network scanner
@@ -329,7 +391,71 @@ func (ns *NetworkScanner) scanPort(host string, port int) {
 		finding.PrivEscPath = finding.PrivEscPath || isPrivEsc
 	}
 
+	ns.applyCVEHints(&finding)
 	ns.addFinding(finding)
+}
+
+func (ns *NetworkScanner) applyCVEHints(f *NetworkFinding) {
+	hints := ns.matchCVEHints(f)
+	if len(hints) == 0 {
+		return
+	}
+
+	f.CVEHints = make([]string, 0, len(hints))
+	primarySeverity := "Low"
+	primaryID := ""
+
+	for i, h := range hints {
+		f.CVEHints = append(f.CVEHints, fmt.Sprintf("%s (%s): %s", h.ID, h.Severity, h.Title))
+		if i == 0 || riskRank(h.Severity) > riskRank(primarySeverity) {
+			primarySeverity = h.Severity
+			primaryID = h.ID
+		}
+		if h.Recommendation != "" {
+			f.Recommendation = joinEvidence(f.Recommendation, h.Recommendation)
+		}
+	}
+
+	if primaryID != "" {
+		f.PrimaryCVE = primaryID
+		f.Proof = joinEvidence(f.Proof, "banner-to-CVE mapping")
+		if riskRank(primarySeverity) > riskRank(f.Risk) {
+			f.Risk = fmt.Sprintf("%s (Potential known vulnerability signature: %s)", primarySeverity, primaryID)
+		}
+	}
+}
+
+func (ns *NetworkScanner) matchCVEHints(f *NetworkFinding) []networkCVEHintRule {
+	fingerprint := strings.ToLower(strings.Join([]string{
+		f.Service,
+		f.Banner,
+		f.Proof,
+		f.Endpoint,
+	}, " | "))
+	if strings.TrimSpace(fingerprint) == "" {
+		return nil
+	}
+
+	var matched []networkCVEHintRule
+	seen := map[string]struct{}{}
+	for _, rule := range networkCVEHintRules {
+		ok := true
+		for _, token := range rule.MatchAll {
+			if !strings.Contains(fingerprint, strings.ToLower(token)) {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue
+		}
+		if _, exists := seen[rule.ID]; exists {
+			continue
+		}
+		seen[rule.ID] = struct{}{}
+		matched = append(matched, rule)
+	}
+	return matched
 }
 
 func (ns *NetworkScanner) assessPortExposure(port int, address string) (risk, rec, proof, signal string, privEsc bool) {

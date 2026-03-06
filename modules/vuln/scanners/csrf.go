@@ -267,6 +267,12 @@ func (s *CSRFScanner) enqueue(u string, depth int) {
 func (s *CSRFScanner) addFinding(f FindingCSRF) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.FormAction, f.FormMethod, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.FormAction, existing.FormMethod, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] CSRF FOUND: %s (Action: %s)\n", f.URL, f.FormAction)

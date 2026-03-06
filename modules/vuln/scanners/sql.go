@@ -94,6 +94,7 @@ func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.
 	if len(customPayloads) > 0 {
 		payloads = append(payloads, customPayloads...)
 	}
+	payloads = finalizeQueryPayloads(payloads, intensity)
 
 	s := &SQLScanner{
 		StartURL:  parsed,
@@ -317,20 +318,22 @@ func (s *SQLScanner) testPOSTPayload(testURL, param, payload string, data url.Va
 func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Response, body string, duration time.Duration) bool {
 	// 1. Error-based detection
 	errorPatterns := []string{
-		"SQL syntax", "mysql_fetch_array", "ora-", "PostgreSQL query failed",
-		"Microsoft OLE DB Provider for SQL Server", "Incorrect syntax near",
-		"Unclosed quotation mark", "JDBC Driver", "Stack trace:", "Internal Server Error",
+		"sql syntax", "mysql_fetch_array", "ora-", "postgresql query failed",
+		"microsoft ole db provider for sql server", "incorrect syntax near",
+		"unclosed quotation mark", "jdbc driver", "sqlstate", "syntax error at or near",
+		"warning: mysql", "sqlite error", "native client", "odbc sql server driver",
 	}
+	bodyLower := strings.ToLower(body)
 
 	for _, pattern := range errorPatterns {
-		if strings.Contains(body, pattern) {
+		if strings.Contains(bodyLower, pattern) {
 			s.addFinding(FindingSQL{
 				Type:            "Error-based SQL Injection",
 				URL:             testURL,
 				Param:           param,
 				Payload:         payload,
 				Evidence:        pattern,
-				ResponseSnippet: snippetAround(body, pattern, 100),
+				ResponseSnippet: snippetAround(bodyLower, pattern, 100),
 			})
 			return true
 		}
@@ -374,11 +377,11 @@ func (s *SQLScanner) fetch(method, target string, data url.Values) (*http.Respon
 	}
 
 	req.Header.Set("User-Agent", "Knife-SQL-Scanner/1.0")
-	
+
 	start := time.Now()
 	resp, err := s.Client.Do(req)
 	duration := time.Since(start)
-	
+
 	if err != nil {
 		return nil, "", 0, false
 	}
@@ -419,6 +422,12 @@ func (s *SQLScanner) enqueue(u string, depth int) {
 func (s *SQLScanner) addFinding(f FindingSQL) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] SQLi FOUND: %s (Param: %s)\n", f.URL, f.Param)

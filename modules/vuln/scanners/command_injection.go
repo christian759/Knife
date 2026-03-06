@@ -31,23 +31,23 @@ type FindingCmdInj struct {
 
 // CmdInjScanner holds the state for the Command Injection scan
 type CmdInjScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan cmdInjCrawlJob
-	Findings    []FindingCmdInj
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Payloads    []string
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan cmdInjCrawlJob
+	Findings     []FindingCmdInj
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Payloads     []string
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // cmdInjCrawlJob represents a URL to be scanned
@@ -315,7 +315,7 @@ func generateCmdInjPayloads(intensity int, targetedCVEs []string, customPayloads
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeQueryPayloads(payloads, intensity)
 }
 
 func (s *CmdInjScanner) markVisited(u string) bool {
@@ -349,6 +349,12 @@ func (s *CmdInjScanner) enqueue(u string, depth int) {
 func (s *CmdInjScanner) addFinding(f FindingCmdInj) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] COMMAND INJECTION FOUND: %s (Param: %s)\n", f.URL, f.Param)

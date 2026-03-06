@@ -31,23 +31,23 @@ type FindingLFI struct {
 
 // LFIScanner holds the state for the LFI scan
 type LFIScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan lfiCrawlJob
-	Findings    []FindingLFI
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Payloads    []string
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan lfiCrawlJob
+	Findings     []FindingLFI
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Payloads     []string
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // lfiCrawlJob represents a URL to be scanned
@@ -330,7 +330,7 @@ func generateLFIPayloads(intensity int, targetedCVEs []string, customPayloads []
 			"input://",
 			"data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+",
 		)
-		
+
 		for i := 10; i <= 20; i++ {
 			dots := strings.Repeat("../", i)
 			payloads = append(payloads, dots+"etc/passwd")
@@ -341,7 +341,7 @@ func generateLFIPayloads(intensity int, targetedCVEs []string, customPayloads []
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeQueryPayloads(payloads, intensity)
 }
 
 // Helper methods
@@ -380,6 +380,12 @@ func (s *LFIScanner) enqueue(u string, depth int) {
 func (s *LFIScanner) addFinding(f FindingLFI) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] LFI FOUND: %s (Param: %s)\n", f.URL, f.Param)

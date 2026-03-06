@@ -31,23 +31,23 @@ type FindingTraversal struct {
 
 // TraversalScanner holds the state for the Directory Traversal scan
 type TraversalScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan traversalCrawlJob
-	Findings    []FindingTraversal
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Payloads    []string
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan traversalCrawlJob
+	Findings     []FindingTraversal
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Payloads     []string
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // traversalCrawlJob represents a URL to be scanned
@@ -288,7 +288,7 @@ func generateTraversalPayloads(intensity int, targetedCVEs []string, customPaylo
 		payloads = append(payloads, customPayloads...)
 	}
 
-	return payloads
+	return finalizeQueryPayloads(payloads, intensity)
 }
 
 func (s *TraversalScanner) markVisited(u string) bool {
@@ -322,6 +322,12 @@ func (s *TraversalScanner) enqueue(u string, depth int) {
 func (s *TraversalScanner) addFinding(f FindingTraversal) {
 	s.FindingsMu.Lock()
 	defer s.FindingsMu.Unlock()
+	key := buildFindingKey(f.Type, f.URL, f.Param, f.Payload, f.Evidence)
+	for _, existing := range s.Findings {
+		if buildFindingKey(existing.Type, existing.URL, existing.Param, existing.Payload, existing.Evidence) == key {
+			return
+		}
+	}
 	f.Timestamp = time.Now().Format(time.RFC3339)
 	s.Findings = append(s.Findings, f)
 	log.Printf("[!] TRAVERSAL FOUND: %s (Param: %s)\n", f.URL, f.Param)

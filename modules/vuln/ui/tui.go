@@ -56,11 +56,13 @@ type mainModel struct {
 	uiNotice           string
 	scannerStatus      map[string]string
 	scannerFindings    map[string]int
+	scannerModes       map[engine.ScannerType]string
 	scanStartedAt      time.Time
 	progressPercent    float64
 	lastProgressUpdate string
 	reportPath         string
 	activityLog        []string
+	scanDetailCursor   int
 	summaryCursor      int
 	showEvidence       bool
 
@@ -114,8 +116,10 @@ func initialModel() mainModel {
 
 	scanners := engine.GetScannerInfo()
 	selected := make(map[engine.ScannerType]bool, len(scanners))
+	scannerModes := make(map[engine.ScannerType]string, len(scanners))
 	for _, s := range scanners {
 		selected[s.Type] = true
+		scannerModes[s.Type] = "balanced"
 	}
 
 	return mainModel{
@@ -125,6 +129,7 @@ func initialModel() mainModel {
 		progress:           p,
 		availableScanners:  scanners,
 		selected:           selected,
+		scannerModes:       scannerModes,
 		scannerStatus:      make(map[string]string),
 		scannerFindings:    make(map[string]int),
 		workers:            10,
@@ -207,8 +212,21 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stateConfig:
 		return m.updateConfig(msg)
 	case stateScanning:
-		if k, ok := msg.(tea.KeyMsg); ok && k.String() == "esc" {
-			return m, tea.Quit
+		if k, ok := msg.(tea.KeyMsg); ok {
+			switch k.String() {
+			case "esc":
+				return m, tea.Quit
+			case "up", "k":
+				if m.scanDetailCursor > 0 {
+					m.scanDetailCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.scanDetailCursor < len(m.availableScanners)-1 {
+					m.scanDetailCursor++
+				}
+				return m, nil
+			}
 		}
 		return m, nil
 	case stateSummary:
@@ -258,6 +276,45 @@ func (m mainModel) updateTarget(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func scannerModeOptions(scannerType engine.ScannerType) []string {
+	switch scannerType {
+	case engine.ScannerHeaders, engine.ScannerFiles:
+		return []string{"balanced", "aggressive"}
+	default:
+		return []string{"stealth", "balanced", "aggressive", "deep"}
+	}
+}
+
+func scannerModeDescription(scannerType engine.ScannerType, mode string) string {
+	switch mode {
+	case "stealth":
+		return "low-noise checks with smaller payload breadth"
+	case "aggressive":
+		return "broader payload families and stronger signal extraction"
+	case "deep":
+		return "maximum depth and heavy payload mutation for hard targets"
+	default:
+		return "standard production-friendly coverage and verification"
+	}
+}
+
+func (m *mainModel) cycleScannerMode(scannerType engine.ScannerType, delta int) {
+	options := scannerModeOptions(scannerType)
+	current := strings.ToLower(strings.TrimSpace(m.scannerModes[scannerType]))
+	if current == "" {
+		current = options[0]
+	}
+	idx := 0
+	for i := range options {
+		if options[i] == current {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + len(options)) % len(options)
+	m.scannerModes[scannerType] = options[idx]
+}
+
 func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if len(m.availableScanners) == 0 {
 		m.uiError = "no scanners available"
@@ -283,6 +340,22 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected[cur.Type] = !m.selected[cur.Type]
 			m.uiError = ""
 			m.uiNotice = ""
+			return m, nil
+		case "t":
+			cur := m.availableScanners[m.scannerCursor]
+			m.cycleScannerMode(cur.Type, 1)
+			m.uiNotice = fmt.Sprintf("%s mode -> %s", cur.Type, m.scannerModes[cur.Type])
+			m.uiError = ""
+			return m, nil
+		case "left", "h":
+			cur := m.availableScanners[m.scannerCursor]
+			m.cycleScannerMode(cur.Type, -1)
+			m.uiNotice = fmt.Sprintf("%s mode -> %s", cur.Type, m.scannerModes[cur.Type])
+			return m, nil
+		case "right", "l":
+			cur := m.availableScanners[m.scannerCursor]
+			m.cycleScannerMode(cur.Type, 1)
+			m.uiNotice = fmt.Sprintf("%s mode -> %s", cur.Type, m.scannerModes[cur.Type])
 			return m, nil
 		case "a":
 			for _, s := range m.availableScanners {
@@ -336,6 +409,7 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *mainModel) applyPreset(preset string) {
 	for _, s := range m.availableScanners {
 		m.selected[s.Type] = false
+		m.scannerModes[s.Type] = "balanced"
 	}
 
 	switch preset {
@@ -345,6 +419,9 @@ func (m *mainModel) applyPreset(preset string) {
 				m.selected[s.Type] = true
 			}
 		}
+		m.scannerModes[engine.ScannerXSS] = "aggressive"
+		m.scannerModes[engine.ScannerSQL] = "aggressive"
+		m.scannerModes[engine.ScannerCSRF] = "deep"
 		m.uiNotice = "preset applied: web app focus"
 	case "network":
 		enabled := map[engine.ScannerType]bool{
@@ -361,11 +438,17 @@ func (m *mainModel) applyPreset(preset string) {
 				m.selected[s.Type] = true
 			}
 		}
+		m.scannerModes[engine.ScannerNetwork] = "deep"
+		m.scannerModes[engine.ScannerSSRF] = "aggressive"
+		m.scannerModes[engine.ScannerRCE] = "aggressive"
+		m.scannerModes[engine.ScannerCommandInjection] = "aggressive"
 		m.uiNotice = "preset applied: network and privilege-escalation focus"
 	default:
 		for _, s := range m.availableScanners {
 			m.selected[s.Type] = true
+			m.scannerModes[s.Type] = "aggressive"
 		}
+		m.scannerModes[engine.ScannerNetwork] = "deep"
 		m.uiNotice = "preset applied: full coverage"
 	}
 	m.uiError = ""
@@ -572,6 +655,16 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 	}
 
 	scannerOptions := make(map[string]string)
+	for _, s := range m.availableScanners {
+		if !m.selected[s.Type] {
+			continue
+		}
+		mode := strings.TrimSpace(strings.ToLower(m.scannerModes[s.Type]))
+		if mode == "" {
+			mode = "balanced"
+		}
+		scannerOptions["mode_"+string(s.Type)] = mode
+	}
 	if m.networkSelected() {
 		scannerOptions["network_profile"] = networkProfile
 		scannerOptions["network_timeout_ms"] = strconv.Itoa(m.networkTimeoutMS)
@@ -806,7 +899,11 @@ func (m mainModel) renderScannerPicker() string {
 		if m.selected[s.Type] {
 			check = "[x]"
 		}
-		line := fmt.Sprintf("%s %s %-36s ", cursor, check, s.Name)
+		mode := m.scannerModes[s.Type]
+		if mode == "" {
+			mode = "balanced"
+		}
+		line := fmt.Sprintf("%s %s %-28s mode=%-10s ", cursor, check, s.Name, mode)
 		list.WriteString(line)
 		list.WriteString(m.scannerSeverityStyle(s.Severity).Render("[" + strings.ToUpper(s.Severity) + "]"))
 		list.WriteString("\n")
@@ -815,7 +912,11 @@ func (m mainModel) renderScannerPicker() string {
 	detail := ""
 	if len(m.availableScanners) > 0 {
 		current := m.availableScanners[m.scannerCursor]
-		detail = tui.RenderBox(fmt.Sprintf("Type: %s\nGoal: %s\nMethod: %s", current.Type, current.Description, m.scannerMethod(string(current.Type))))
+		mode := m.scannerModes[current.Type]
+		if mode == "" {
+			mode = "balanced"
+		}
+		detail = tui.RenderBox(fmt.Sprintf("Type: %s\nMode: %s\nGoal: %s\nMethod: %s\nMode effect: %s", current.Type, mode, current.Description, m.scannerMethod(string(current.Type)), scannerModeDescription(current.Type, mode)))
 	}
 
 	presets := tui.RenderBox("Presets\n1: Web App\n2: Network / Priv-Esc\n3: Full Coverage")
@@ -839,7 +940,7 @@ func (m mainModel) renderScannerPicker() string {
 		footer.WriteString("\n" + tui.RenderInfo(m.uiNotice))
 	}
 	footer.WriteString("\n\n")
-	footer.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | 1/2/3: presets | a: all | n: none | i: invert | b: back | enter: continue | esc: quit"))
+	footer.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | t or h/l: cycle mode | 1/2/3: presets | a: all | n: none | i: invert | b: back | enter: continue | esc: quit"))
 
 	return body + footer.String()
 }
@@ -898,7 +999,36 @@ func (m mainModel) renderScanning() string {
 		}
 		status := m.formatScannerStatus(info.Type)
 		findings := m.scannerFindings[string(info.Type)]
-		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d\n", string(info.Type), status, findings))
+		mode := m.scannerModes[info.Type]
+		if mode == "" {
+			mode = "balanced"
+		}
+		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d mode=%s\n", string(info.Type), status, findings, mode))
+	}
+
+	selectedScanners := make([]engine.ScannerInfo, 0, len(m.availableScanners))
+	for _, info := range m.availableScanners {
+		if m.selected[info.Type] {
+			selectedScanners = append(selectedScanners, info)
+		}
+	}
+	if len(selectedScanners) > 0 {
+		if m.scanDetailCursor < 0 {
+			m.scanDetailCursor = 0
+		}
+		if m.scanDetailCursor >= len(selectedScanners) {
+			m.scanDetailCursor = len(selectedScanners) - 1
+		}
+		cur := selectedScanners[m.scanDetailCursor]
+		mode := m.scannerModes[cur.Type]
+		if mode == "" {
+			mode = "balanced"
+		}
+		b.WriteString("\nFocused scanner:\n")
+		b.WriteString(fmt.Sprintf("- %s (%s)\n", cur.Name, cur.Type))
+		b.WriteString(fmt.Sprintf("- mode: %s\n", mode))
+		b.WriteString(fmt.Sprintf("- technique: %s\n", m.scannerMethod(string(cur.Type))))
+		b.WriteString(fmt.Sprintf("- mode effect: %s\n", scannerModeDescription(cur.Type, mode)))
 	}
 
 	b.WriteString("\nRecent activity:\n")
@@ -917,7 +1047,7 @@ func (m mainModel) renderScanning() string {
 	if m.progressMsg.Error != nil {
 		b.WriteString(tui.RenderError(m.progressMsg.Error.Error()))
 	} else {
-		b.WriteString(tui.RenderInfo("Scan running. Press esc to quit."))
+		b.WriteString(tui.RenderInfo("Scan running. j/k to inspect scanner details, esc to quit."))
 	}
 	return b.String()
 }

@@ -3,6 +3,7 @@ package scanners
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -45,7 +46,16 @@ func (s *HeadersScanner) Run() {
 	s.checkHeader(resp, "X-Content-Type-Options", "Missing XCTO (MIME sniffing risk)")
 	s.checkHeader(resp, "Referrer-Policy", "Missing Referrer-Policy")
 	s.checkHeader(resp, "Permissions-Policy", "Missing Permissions-Policy")
-	
+	s.checkHeader(resp, "Cross-Origin-Opener-Policy", "Missing COOP")
+	s.checkHeader(resp, "Cross-Origin-Resource-Policy", "Missing CORP")
+
+	s.checkHeaderPolicy(resp, "X-Content-Type-Options", []string{"nosniff"}, "Header should be set to nosniff")
+	s.checkHeaderPolicy(resp, "X-Frame-Options", []string{"deny", "sameorigin"}, "Header should be DENY or SAMEORIGIN")
+	s.checkHeaderPolicy(resp, "Referrer-Policy", []string{"strict-origin-when-cross-origin", "no-referrer", "same-origin"}, "Header should use a restrictive referrer policy")
+	s.checkCSPPolicy(resp)
+	s.checkHSTS(resp)
+	s.checkCookieFlags(resp)
+
 	// Check for Server header (Information Disclosure)
 	server := resp.Header.Get("Server")
 	if server != "" {
@@ -71,6 +81,76 @@ func (s *HeadersScanner) checkHeader(resp *http.Response, header, name string) {
 			Evidence:  fmt.Sprintf("%s is not set.", header),
 			Timestamp: time.Now().Format(time.RFC3339),
 		})
+	}
+}
+
+func (s *HeadersScanner) checkHeaderPolicy(resp *http.Response, header string, allowed []string, message string) {
+	val := strings.ToLower(strings.TrimSpace(resp.Header.Get(header)))
+	if val == "" {
+		return
+	}
+	for _, a := range allowed {
+		if strings.Contains(val, a) {
+			return
+		}
+	}
+	s.Findings = append(s.Findings, FindingHeader{
+		Type:      "Security Header Misconfiguration",
+		URL:       s.Target,
+		Header:    header,
+		Status:    "Misconfigured",
+		Evidence:  fmt.Sprintf("%s. Current value: %s", message, resp.Header.Get(header)),
+		Timestamp: time.Now().Format(time.RFC3339),
+	})
+}
+
+func (s *HeadersScanner) checkCSPPolicy(resp *http.Response) {
+	csp := strings.ToLower(resp.Header.Get("Content-Security-Policy"))
+	if csp == "" {
+		return
+	}
+	if strings.Contains(csp, "unsafe-inline") || strings.Contains(csp, "unsafe-eval") || strings.Contains(csp, "*") {
+		s.Findings = append(s.Findings, FindingHeader{
+			Type:      "Security Header Misconfiguration",
+			URL:       s.Target,
+			Header:    "Content-Security-Policy",
+			Status:    "Misconfigured",
+			Evidence:  "CSP contains weak directives (unsafe-inline/unsafe-eval/wildcard).",
+			Timestamp: time.Now().Format(time.RFC3339),
+		})
+	}
+}
+
+func (s *HeadersScanner) checkHSTS(resp *http.Response) {
+	hsts := strings.ToLower(resp.Header.Get("Strict-Transport-Security"))
+	if hsts == "" {
+		return
+	}
+	if !strings.Contains(hsts, "max-age=") {
+		s.Findings = append(s.Findings, FindingHeader{
+			Type:      "Security Header Misconfiguration",
+			URL:       s.Target,
+			Header:    "Strict-Transport-Security",
+			Status:    "Misconfigured",
+			Evidence:  "HSTS missing max-age directive.",
+			Timestamp: time.Now().Format(time.RFC3339),
+		})
+	}
+}
+
+func (s *HeadersScanner) checkCookieFlags(resp *http.Response) {
+	for _, cookie := range resp.Header.Values("Set-Cookie") {
+		lc := strings.ToLower(cookie)
+		if !strings.Contains(lc, "secure") || !strings.Contains(lc, "httponly") || !strings.Contains(lc, "samesite") {
+			s.Findings = append(s.Findings, FindingHeader{
+				Type:      "Cookie Security Misconfiguration",
+				URL:       s.Target,
+				Header:    "Set-Cookie",
+				Status:    "Misconfigured",
+				Evidence:  fmt.Sprintf("Cookie missing one or more flags (Secure/HttpOnly/SameSite): %s", cookie),
+				Timestamp: time.Now().Format(time.RFC3339),
+			})
+		}
 	}
 }
 
