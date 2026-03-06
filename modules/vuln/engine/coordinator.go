@@ -65,11 +65,8 @@ func (sc *ScannerCoordinator) RunAllScans() (*ScanResult, error) {
 
 	// Run each scanner
 	for _, scannerType := range sc.config.EnabledScanners {
-		if err := sc.runScanner(scannerType); err != nil {
+		if _, err := sc.runScanner(scannerType); err != nil {
 			fmt.Printf("[-] Scanner %s failed: %v\n", scannerType, err)
-			sc.updateProgress(scannerType, "failed", 0, err)
-		} else {
-			sc.updateProgress(scannerType, "completed", 0, nil)
 		}
 	}
 
@@ -89,40 +86,54 @@ func (sc *ScannerCoordinator) RunAllScans() (*ScanResult, error) {
 }
 
 // runScanner executes a specific scanner type
-func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
+func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) (int, error) {
 	fmt.Printf("[*] Running %s scanner...\n", scannerType)
 	sc.updateProgress(scannerType, "running", 0, nil)
+	before := sc.findingCount()
+
+	var err error
 
 	switch scannerType {
 	case ScannerXSS:
-		return sc.runXSSScanner()
+		err = sc.runXSSScanner()
 	case ScannerCSRF:
-		return sc.runCSRFScanner()
+		err = sc.runCSRFScanner()
 	case ScannerLFI:
-		return sc.runLFIScanner()
+		err = sc.runLFIScanner()
 	case ScannerSSRF:
-		return sc.runSSRFScanner()
+		err = sc.runSSRFScanner()
 	case ScannerCommandInjection:
-		return sc.runCommandInjectionScanner()
+		err = sc.runCommandInjectionScanner()
 	case ScannerRCE:
-		return sc.runRCEScanner()
+		err = sc.runRCEScanner()
 	case ScannerDirectoryTraversal:
-		return sc.runDirectoryTraversalScanner()
+		err = sc.runDirectoryTraversalScanner()
 	case ScannerXXE:
-		return sc.runXXEScanner()
+		err = sc.runXXEScanner()
 	case ScannerOpenRedirect:
-		return sc.runOpenRedirectScanner()
+		err = sc.runOpenRedirectScanner()
 	case ScannerSQL:
-		return sc.runSQLScanner()
+		err = sc.runSQLScanner()
 	case ScannerHeaders:
-		return sc.runHeadersScanner()
+		err = sc.runHeadersScanner()
 	case ScannerFiles:
-		return sc.runFilesScanner()
+		err = sc.runFilesScanner()
 	case ScannerNetwork:
-		return sc.runNetworkScanner()
+		err = sc.runNetworkScanner()
 	default:
-		return fmt.Errorf("unknown scanner type: %s", scannerType)
+		err = fmt.Errorf("unknown scanner type: %s", scannerType)
 	}
+
+	found := sc.findingCount() - before
+	if found < 0 {
+		found = 0
+	}
+	if err != nil {
+		sc.updateProgress(scannerType, "failed", found, err)
+		return found, err
+	}
+	sc.updateProgress(scannerType, "completed", found, nil)
+	return found, nil
 }
 
 // SQL Scanner
@@ -348,6 +359,12 @@ func (sc *ScannerCoordinator) GetFindings() []UnifiedFinding {
 	sc.findingsMu.Lock()
 	defer sc.findingsMu.Unlock()
 	return sc.findings
+}
+
+func (sc *ScannerCoordinator) findingCount() int {
+	sc.findingsMu.Lock()
+	defer sc.findingsMu.Unlock()
+	return len(sc.findings)
 }
 
 // GetProgressChannel returns the progress channel for TUI updates

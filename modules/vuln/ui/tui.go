@@ -54,6 +54,9 @@ type mainModel struct {
 	progressPercent    float64
 	lastProgressUpdate string
 	reportPath         string
+	activityLog        []string
+	summaryCursor      int
+	showEvidence       bool
 
 	// Scan settings
 	workers   int
@@ -108,6 +111,8 @@ func initialModel() mainModel {
 		depth:              2,
 		progressPercent:    0,
 		lastProgressUpdate: "waiting",
+		activityLog:        []string{},
+		showEvidence:       true,
 	}
 }
 
@@ -141,6 +146,8 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.ScannerName != "" {
 			m.scannerStatus[msg.ScannerName] = msg.Status
 			m.scannerFindings[msg.ScannerName] = msg.FindingsCount
+			m.lastProgressUpdate = fmt.Sprintf("%s: %s (%s)", msg.ScannerName, msg.Status, m.scannerGoal(msg.ScannerName))
+			m.appendActivity(fmt.Sprintf("[%s] %s (%s) findings=%d", msg.ScannerName, strings.ToUpper(msg.Status), m.scannerMethod(msg.ScannerName), msg.FindingsCount))
 		}
 
 		total := m.selectedCount()
@@ -177,6 +184,19 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch k.String() {
 			case "enter", "esc":
 				return m, tea.Quit
+			case "up", "k":
+				if m.summaryCursor > 0 {
+					m.summaryCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.results != nil && m.summaryCursor < len(m.results.Findings)-1 {
+					m.summaryCursor++
+				}
+				return m, nil
+			case "e":
+				m.showEvidence = !m.showEvidence
+				return m, nil
 			}
 		}
 	}
@@ -349,6 +369,7 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 	m.scannerStatus = make(map[string]string)
 	m.scannerFindings = make(map[string]int)
 	m.uiError = ""
+	m.activityLog = []string{fmt.Sprintf("[setup] starting scan on %s", m.targetURL)}
 
 	enabled := make([]engine.ScannerType, 0, m.selectedCount())
 	for _, s := range m.availableScanners {
@@ -418,6 +439,98 @@ func (m mainModel) completedCount() int {
 	return done
 }
 
+func (m *mainModel) appendActivity(line string) {
+	if strings.TrimSpace(line) == "" {
+		return
+	}
+	m.activityLog = append(m.activityLog, line)
+	if len(m.activityLog) > 30 {
+		m.activityLog = m.activityLog[len(m.activityLog)-30:]
+	}
+}
+
+func (m mainModel) scannerInfoByType(scannerType string) (engine.ScannerInfo, bool) {
+	for _, info := range m.availableScanners {
+		if string(info.Type) == scannerType {
+			return info, true
+		}
+	}
+	return engine.ScannerInfo{}, false
+}
+
+func (m mainModel) scannerGoal(scannerType string) string {
+	if info, ok := m.scannerInfoByType(scannerType); ok {
+		return info.Description
+	}
+	return "running vulnerability checks"
+}
+
+func (m mainModel) scannerMethod(scannerType string) string {
+	switch scannerType {
+	case string(engine.ScannerXSS):
+		return "payload reflection + DOM pattern checks"
+	case string(engine.ScannerCSRF):
+		return "form discovery + anti-CSRF token validation"
+	case string(engine.ScannerSQL):
+		return "injection payload probes + SQL error signals"
+	case string(engine.ScannerLFI):
+		return "path traversal payload probes"
+	case string(engine.ScannerSSRF):
+		return "URL parameter probes to internal resources"
+	case string(engine.ScannerCommandInjection):
+		return "shell metacharacter payload probes"
+	case string(engine.ScannerRCE):
+		return "code execution payload heuristics"
+	case string(engine.ScannerDirectoryTraversal):
+		return "dot-dot-slash traversal checks"
+	case string(engine.ScannerXXE):
+		return "XML entity payload checks"
+	case string(engine.ScannerOpenRedirect):
+		return "redirect parameter tampering"
+	case string(engine.ScannerHeaders):
+		return "security header presence checks"
+	case string(engine.ScannerFiles):
+		return "common sensitive path discovery"
+	case string(engine.ScannerNetwork):
+		return "port/service enumeration"
+	default:
+		return "automated scanner logic"
+	}
+}
+
+func findingGoal(findingType string) string {
+	switch strings.ToLower(findingType) {
+	case "xss":
+		return "find reflected/stored script execution paths"
+	case "csrf":
+		return "find state-changing forms without CSRF protection"
+	case "sql":
+		return "find SQL parser errors and injectable parameters"
+	case "lfi":
+		return "find local file inclusion and traversal read paths"
+	case "ssrf":
+		return "find server-side request pivot paths"
+	case "command injection":
+		return "find command execution vectors through input"
+	case "rce":
+		return "find remote code execution primitives"
+	case "directory traversal":
+		return "find out-of-root file access paths"
+	case "xxe":
+		return "find XML parser entity expansion vectors"
+	case "open redirect":
+		return "find unsafe redirect destinations"
+	case "headers":
+		return "find missing hardening headers"
+	case "files":
+		return "find exposed sensitive files"
+	case "network":
+		return "find open ports and exposed services"
+	default:
+		return "identify suspicious behavior requiring review"
+	}
+}
+
 func (m mainModel) formatScannerStatus(scannerType engine.ScannerType) string {
 	status := m.scannerStatus[string(scannerType)]
 	switch status {
@@ -469,7 +582,7 @@ func (m mainModel) renderScannerPicker() string {
 	if len(m.availableScanners) > 0 {
 		current := m.availableScanners[m.scannerCursor]
 		b.WriteString("\n")
-		b.WriteString(tui.RenderBox(fmt.Sprintf("Description: %s\nType: %s", current.Description, current.Type)))
+		b.WriteString(tui.RenderBox(fmt.Sprintf("What we search for: %s\nHow we test: %s\nType: %s", current.Description, m.scannerMethod(string(current.Type)), current.Type)))
 	}
 
 	if m.uiError != "" {
@@ -526,8 +639,23 @@ func (m mainModel) renderScanning() string {
 		status := m.formatScannerStatus(info.Type)
 		findings := m.scannerFindings[string(info.Type)]
 		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d\n", string(info.Type), status, findings))
+		b.WriteString(fmt.Sprintf("  searching for: %s\n", info.Description))
+		b.WriteString(fmt.Sprintf("  method: %s\n", m.scannerMethod(string(info.Type))))
 	}
 
+	b.WriteString("\n")
+	b.WriteString("Recent activity:\n")
+	if len(m.activityLog) == 0 {
+		b.WriteString("- waiting for first scanner event...\n")
+	} else {
+		start := len(m.activityLog) - 8
+		if start < 0 {
+			start = 0
+		}
+		for i := start; i < len(m.activityLog); i++ {
+			b.WriteString("- " + m.activityLog[i] + "\n")
+		}
+	}
 	b.WriteString("\n")
 	if m.progressMsg.Error != nil {
 		b.WriteString(tui.RenderError(m.progressMsg.Error.Error()))
@@ -575,10 +703,56 @@ func (m mainModel) renderSummary() string {
 				b.WriteString(fmt.Sprintf("- %s: %d\n", k, summary[k]))
 			}
 		}
+
+		if len(m.results.Findings) > 0 {
+			if m.summaryCursor >= len(m.results.Findings) {
+				m.summaryCursor = len(m.results.Findings) - 1
+			}
+			if m.summaryCursor < 0 {
+				m.summaryCursor = 0
+			}
+			b.WriteString("\nFindings Browser:\n")
+			window := 8
+			start := m.summaryCursor - window/2
+			if start < 0 {
+				start = 0
+			}
+			end := start + window
+			if end > len(m.results.Findings) {
+				end = len(m.results.Findings)
+			}
+			for i := start; i < end; i++ {
+				cursor := " "
+				if i == m.summaryCursor {
+					cursor = ">"
+				}
+				f := m.results.Findings[i]
+				b.WriteString(fmt.Sprintf("%s [%s] %s | %s\n", cursor, f.Severity, f.Type, f.URL))
+			}
+
+			f := m.results.Findings[m.summaryCursor]
+			b.WriteString("\nSelected Finding Detail:\n")
+			b.WriteString(fmt.Sprintf("- Name: %s\n", f.Name))
+			b.WriteString(fmt.Sprintf("- Type: %s\n", f.Type))
+			b.WriteString(fmt.Sprintf("- Severity: %s\n", f.Severity))
+			if f.Method != "" {
+				b.WriteString(fmt.Sprintf("- Method: %s\n", f.Method))
+			}
+			if f.Param != "" {
+				b.WriteString(fmt.Sprintf("- Parameter: %s\n", f.Param))
+			}
+			if f.Payload != "" {
+				b.WriteString(fmt.Sprintf("- Payload: %s\n", f.Payload))
+			}
+			b.WriteString(fmt.Sprintf("- Scanner Goal: %s\n", findingGoal(f.Type)))
+			if m.showEvidence && f.Evidence != "" {
+				b.WriteString(fmt.Sprintf("- Evidence: %s\n", f.Evidence))
+			}
+		}
 	}
 
 	b.WriteString("\n")
-	b.WriteString(tui.RenderHelp("enter/esc: exit"))
+	b.WriteString(tui.RenderHelp("j/k or arrows: browse findings | e: toggle evidence | enter/esc: exit"))
 	return b.String()
 }
 
