@@ -28,6 +28,7 @@ type UnifiedFinding struct {
 	FormAction   string            `json:"form_action,omitempty"`   // For CSRF
 	MissingToken bool              `json:"missing_token,omitempty"` // For CSRF
 	PostedData   map[string]string `json:"posted_data,omitempty"`   // For stored XSS
+	CVE          string            `json:"cve,omitempty"`           // Linked CVE ID
 	
 	// Raw finding data (for detailed inspection)
 	RawFinding interface{} `json:"-"` // Original scanner-specific finding
@@ -58,6 +59,7 @@ const (
 	ScannerOpenRedirect      ScannerType = "open_redirect"
 	ScannerHeaders           ScannerType = "headers"
 	ScannerFiles             ScannerType = "files"
+	ScannerNetwork           ScannerType = "network"
 )
 
 // ScannerInfo provides metadata about a scanner
@@ -341,5 +343,18 @@ func ConvertRedirectFinding(f FindingRedirect) UnifiedFinding {
 		Payload:    f.Payload,
 		Location:   f.RedirectLocation,
 		RawFinding: f,
+	}
+}
+
+// ConvertNetworkFinding converts NetworkFinding to UnifiedFinding
+func ConvertNetworkFinding(f NetworkFinding, target string) UnifiedFinding {
+	return UnifiedFinding{
+		Type:            "Network Service",
+		Name:            fmt.Sprintf("Open Port: %d (%s)", f.Port, f.Service),
+		URL:             target,
+		Severity:        "Medium",
+		Timestamp:       time.Now(),
+		Evidence:        fmt.Sprintf("Status: %s, Banner: %s", f.State, f.Banner),
+		RawFinding:      f,
 	}
 }

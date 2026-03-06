@@ -21,6 +21,7 @@ type ScanConfig struct {
 	Intensity       int               // 1-5, controls payload variety and depth
 	CustomPayloads  map[string][]string // ScannerType -> Payloads
 	ScannerOptions  map[string]string   // Arbitrary per-scanner options
+	TargetedCVEs    []string          // List of CVE IDs to focus on
 }
 
 // ScanResult holds the results of a complete vulnerability scan
@@ -115,6 +116,8 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 		return sc.runHeadersScanner()
 	case ScannerFiles:
 		return sc.runFilesScanner()
+	case ScannerNetwork:
+		return sc.runNetworkScanner()
 	default:
 		return fmt.Errorf("unknown scanner type: %s", scannerType)
 	}
@@ -123,7 +126,8 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 // SQL Scanner
 func (sc *ScannerCoordinator) runSQLScanner() error {
 	scanner, err := NewSQLScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle,
+		sc.config.Intensity, sc.config.CustomPayloads[string(ScannerSQL)])
 	if err != nil {
 		return err
 	}
@@ -161,10 +165,22 @@ func (sc *ScannerCoordinator) runFilesScanner() error {
 	return nil
 }
 
+// Network Scanner
+func (sc *ScannerCoordinator) runNetworkScanner() error {
+	scanner := NewNetworkScanner(sc.config.Target, sc.config.Workers, sc.config.Intensity)
+	scanner.Run()
+	for _, f := range scanner.Findings {
+		sc.addFinding(ConvertNetworkFinding(f, sc.config.Target))
+	}
+	fmt.Printf("[✓] Network Scanner: Found %d open ports\n", len(scanner.Findings))
+	return nil
+}
+
 // XSS Scanner
 func (sc *ScannerCoordinator) runXSSScanner() error {
 	scanner, err := newScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, 
-		sc.config.MaxDepth, "normal", false, sc.config.Throttle)
+		sc.config.MaxDepth, sc.config.Intensity, false, sc.config.Throttle,
+		sc.config.CustomPayloads[string(ScannerXSS)])
 	if err != nil {
 		return err
 	}
