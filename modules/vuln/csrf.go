@@ -41,6 +41,8 @@ type CSRFScanner struct {
 	PageCount   int
 	PageCountMu sync.Mutex
 	MaxDepth    int
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -50,8 +52,7 @@ type csrfCrawlJob struct {
 	Depth int
 }
 
-// NewCSRFScanner creates a new instance of the CSRF scanner
-func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*CSRFScanner, error) {
+func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string) (*CSRFScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -61,15 +62,17 @@ func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time
 	}
 
 	s := &CSRFScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan csrfCrawlJob, 1000),
-		Findings: []FindingCSRF{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan csrfCrawlJob, 1000),
+		Findings:     []FindingCSRF{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -181,7 +184,7 @@ func (s *CSRFScanner) analyzePage(u string, depth int) {
 
 		// Check for anti-CSRF tokens
 		hasToken := false
-		sel.Find("input").Each(func(j int, input *goquery.Selection) {
+		sel.Find("input, select, textarea").Each(func(j int, input *goquery.Selection) {
 			name, _ := input.Attr("name")
 			name = strings.ToLower(name)
 			if strings.Contains(name, "csrf") ||
@@ -194,14 +197,31 @@ func (s *CSRFScanner) analyzePage(u string, depth int) {
 
 		if !hasToken {
 			absAction, _ := s.normalize(u, action)
-			s.addFinding(FindingCSRF{
-				Type:         "Potential CSRF",
-				URL:          u,
-				FormAction:   absAction,
-				FormMethod:   method,
-				MissingToken: true,
-				Evidence:     "Form found without common anti-CSRF token fields.",
-			})
+			// Higher intensity analysis: check if form performs sensitive actions
+			isSensitive := true
+			if s.Intensity < 3 {
+				// Only flag if it looks like a login/password/etc form
+				sensitiveKeywords := []string{"login", "pass", "email", "delete", "update", "profile", "user"}
+				isSensitive = false
+				formHTML, _ := sel.Html()
+				for _, kw := range sensitiveKeywords {
+					if strings.Contains(strings.ToLower(formHTML), kw) {
+						isSensitive = true
+						break
+					}
+				}
+			}
+
+			if isSensitive {
+				s.addFinding(FindingCSRF{
+					Type:         "Potential CSRF",
+					URL:          u,
+					FormAction:   absAction,
+					FormMethod:   method,
+					MissingToken: true,
+					Evidence:     "Form found without common anti-CSRF token fields (POST method).",
+				})
+			}
 		}
 	})
 

@@ -40,6 +40,8 @@ type RedirectScanner struct {
 	PageCount   int
 	PageCountMu sync.Mutex
 	MaxDepth    int
+	Intensity   int
+	TargetedCVEs []string
 	Payloads    []string
 	Throttle    time.Duration
 }
@@ -50,14 +52,11 @@ type redirectCrawlJob struct {
 	Depth int
 }
 
-// NewRedirectScanner creates a new instance of the Redirect scanner
-func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*RedirectScanner, error) {
+func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*RedirectScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
 	}
-	// Important: We need a client that does NOT follow redirects automatically
-	// so we can inspect the Location header.
 	client := &http.Client{
 		Timeout: 20 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -65,17 +64,21 @@ func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle 
 		},
 	}
 
+	payloads := generateRedirectPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &RedirectScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan redirectCrawlJob, 1000),
-		Findings: []FindingRedirect{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateRedirectPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan redirectCrawlJob, 1000),
+		Findings:     []FindingRedirect{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -261,32 +264,46 @@ func (s *RedirectScanner) isExternalRedirect(loc, payload string) bool {
 	return false
 }
 
-func generateRedirectPayloads() []string {
-	return []string{
-		"http://evil.com",
-		"https://evil.com",
-		"//evil.com",
-		"//google.com",
-		"http://google.com",
-		"https://google.com",
-		"javascript:alert(1)",
-		"javascript:prompt(1)",
-		"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==", // <script>alert(1)</script>
-		"/%09/evil.com",
-		"/%5c/evil.com",
-		"//www.google.com/%2e%2e",
-		"http://www.evil.com",
-		"https://www.evil.com",
-		"///evil.com",
-		"\\/evil.com",
-		"https:evil.com",
-		"http:evil.com",
-		"evil.com",
-		"google.com",
-		"http://0177.0.0.1", // Octal IP
-		"http://2130706433", // Decimal IP
-		"http://[::1]",      // IPv6
+func generateRedirectPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerOpenRedirect {
+			payloads = append(payloads, cve.Payloads...)
+		}
 	}
+
+	base := []string{
+		"http://evil.com",
+		"https://google.com",
+		"//evil.com",
+	}
+
+	if intensity > 2 {
+		base = append(base, []string{
+			"javascript:alert(1)",
+			"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+			"/%09/evil.com",
+			"/%5c/evil.com",
+		}...)
+	}
+
+	if intensity > 3 {
+		base = append(base, []string{
+			"//www.google.com/%2e%2e",
+			"http://www.target.com@www.evil.com",
+			"http:evil.com",
+			"//evil%0d%0acom",
+		}...)
+	}
+
+	payloads = append(payloads, base...)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
+
+	return payloads
 }
 
 func (s *RedirectScanner) markVisited(u string) bool {

@@ -273,38 +273,28 @@ func (sc *ScannerCoordinator) runRCEScanner() error {
 
 // Directory Traversal Scanner
 func (sc *ScannerCoordinator) runDirectoryTraversalScanner() error {
-	scanner, err := NewTraversalScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewTraversalScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["directory_traversal"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertTraversalFinding(f))
 	}
-	
 	fmt.Printf("[✓] Directory Traversal Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
 
 // XXE Scanner
 func (sc *ScannerCoordinator) runXXEScanner() error {
-	scanner, err := NewXXEScanner(sc.config.Target, sc.config.Workers, 
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle)
+	scanner, err := NewXXEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs, sc.config.CustomPayloads["xxe"])
 	if err != nil {
 		return err
 	}
-	
 	scanner.Run()
-	
-	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertXXEFinding(f))
 	}
-	
 	fmt.Printf("[✓] XXE Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }

