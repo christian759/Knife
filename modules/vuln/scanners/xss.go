@@ -109,7 +109,12 @@ func defaultPayloads() ([]string, []string) {
 	return basic, full
 }
 
-// create scanner
+// NewScanner creates an XSSScanner configured for the requested target.
+func NewScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string) (*XSSScanner, error) {
+	return newScanner(start, workers, maxPages, maxDepth, intensity, useChrome, throttle, customPayloads)
+}
+
+// newScanner contains the shared construction logic for XSS scanners.
 func newScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string) (*XSSScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
@@ -638,4 +643,9 @@ func (s *XSSScanner) run() {
 	if s.ChromeCancel != nil {
 		s.ChromeCancel()
 	}
+}
+
+// Run starts the XSS scan.
+func (s *XSSScanner) Run() {
+	s.run()
 }

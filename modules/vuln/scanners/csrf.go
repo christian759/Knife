@@ -28,22 +28,22 @@ type FindingCSRF struct {
 
 // CSRFScanner holds the state for the CSRF scan
 type CSRFScanner struct {
-	StartURL    *url.URL
-	Client      *http.Client
-	Visited     map[string]bool
-	VisitedMu   sync.RWMutex
-	Queue       chan csrfCrawlJob
-	Findings    []FindingCSRF
-	FindingsMu  sync.Mutex
-	Workers     int
-	Active      int32
-	MaxPages    int
-	PageCount   int
-	PageCountMu sync.Mutex
-	MaxDepth    int
-	Intensity   int
+	StartURL     *url.URL
+	Client       *http.Client
+	Visited      map[string]bool
+	VisitedMu    sync.RWMutex
+	Queue        chan csrfCrawlJob
+	Findings     []FindingCSRF
+	FindingsMu   sync.Mutex
+	Workers      int
+	Active       int32
+	MaxPages     int
+	PageCount    int
+	PageCountMu  sync.Mutex
+	MaxDepth     int
+	Intensity    int
 	TargetedCVEs []string
-	Throttle    time.Duration
+	Throttle     time.Duration
 }
 
 // csrfCrawlJob represents a URL to be scanned
@@ -130,13 +130,6 @@ func (s *CSRFScanner) worker(wg *sync.WaitGroup) {
 
 		atomic.AddInt32(&s.Active, -1)
 	}
-}
-
-func (s *CSRFScanner) crawl(u string, depth int) {
-	// Re-fetch logic is duplicated here to keep worker clean,
-	// but in analyzePage we also fetch. Optimization: fetch once.
-	// For now, let's just rely on analyzePage to do the work and crawling logic inside it?
-	// Actually, analyzePage fetches, so we can extract links there.
 }
 
 func (s *CSRFScanner) analyzePage(u string, depth int) {
