@@ -41,17 +41,17 @@ func RunAdvancedScan(config ScanConfig) (*ScanResult, error) {
 // RunAllVulnScanners remains for backward compatibility but uses the new logic
 func RunAllVulnScanners(target string, headers map[string]string, cookies string) error {
 	config := ScanConfig{
-		Target:          target,
-		Headers:         headers,
-		Cookies:         cookies,
-		Workers:         10,
-		MaxPages:        50,
-		MaxDepth:        2,
-		Throttle:        200 * time.Millisecond,
-		Intensity:       3,
+		Target:    target,
+		Headers:   headers,
+		Cookies:   cookies,
+		Workers:   10,
+		MaxPages:  50,
+		MaxDepth:  2,
+		Throttle:  200 * time.Millisecond,
+		Intensity: 3,
 		EnabledScanners: []ScannerType{
-			ScannerXSS, ScannerCSRF, ScannerLFI, ScannerSSRF, 
-			ScannerCommandInjection, ScannerRCE, ScannerDirectoryTraversal, 
+			ScannerXSS, ScannerCSRF, ScannerLFI, ScannerSSRF,
+			ScannerCommandInjection, ScannerRCE, ScannerDirectoryTraversal,
 			ScannerXXE, ScannerOpenRedirect, ScannerSQL, ScannerHeaders, ScannerFiles,
 			ScannerNetwork,
 		},
@@ -63,7 +63,7 @@ func RunAllVulnScanners(target string, headers map[string]string, cookies string
 	}
 
 	// Write unified report
-	err = WriteUnifiedReport(result.Findings, "", target)
+	_, err = WriteUnifiedReport(result.Findings, "", target)
 	if err != nil {
 		return fmt.Errorf("failed to write report: %w", err)
 	}

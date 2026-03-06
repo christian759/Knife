@@ -156,7 +156,7 @@ func vulnDetails(name string) VulnInfo {
 			Exploitation:  "Attackers can read local files or make network requests from the server by embedding external entities.",
 			Investigation: "Send XML payloads that reference local files (e.g., file:///etc/passwd) or remote servers to detect leaks in the parser response.",
 		}
-	
+
 	case strings.Contains(n, "header"):
 		return VulnInfo{
 			Severity:      "Low",
@@ -313,26 +313,27 @@ func WriteReport(filename string) error {
 }
 
 // WriteUnifiedReport generates a comprehensive HTML report from all scanner findings
-func WriteUnifiedReport(findings []UnifiedFinding, filename string, target string) error {
+func WriteUnifiedReport(findings []UnifiedFinding, filename string, target string) (string, error) {
 	now := time.Now().Format("02 Jan 2006 15:04:05 MST")
-	
-	// Extract target name from URL or use fallback
+
+	// Extract target name from URL or use fallback. Keep it filesystem-safe
+	// so the report path works across Windows/Linux/macOS.
 	targetName := "scan"
 	if target != "" {
 		targetName = strings.ReplaceAll(strings.ReplaceAll(target, "http://", ""), "https://", "")
-		targetName = strings.ReplaceAll(strings.ReplaceAll(targetName, "/", "_"), ":", "_")
 	}
-	
-	// Create per-target directory: ~/targetname/
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("cannot determine user home directory: %w", err)
+	safeName := regexp.MustCompile(`[^a-zA-Z0-9._-]+`).ReplaceAllString(targetName, "_")
+	safeName = strings.Trim(safeName, "._-")
+	if safeName == "" {
+		safeName = "scan"
 	}
-	targetDir := filepath.Join(homeDir, targetName)
+
+	// Save under a relative folder to keep output portable across machines.
+	targetDir := filepath.Join("reports", safeName)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+		return "", fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
 	}
-	
+
 	// If filename is empty, generate a timestamped one
 	if filename == "" {
 		filename = fmt.Sprintf("unified_report_%d.html", time.Now().Unix())
@@ -340,20 +341,20 @@ func WriteUnifiedReport(findings []UnifiedFinding, filename string, target strin
 		// Keep the user-provided base name but ensure it's safe
 		filename = filepath.Base(filename)
 	}
-	
+
 	fullPath := filepath.Join(targetDir, filename)
-	
+
 	f, err := os.Create(fullPath)
 	if err != nil {
-		return fmt.Errorf("failed to create report file: %w", err)
+		return "", fmt.Errorf("failed to create report file: %w", err)
 	}
 	defer f.Close()
-	
-	fmt.Printf("[+] Report will be saved at: %s\n", fullPath)
-	
+
+	fmt.Printf("[+] Report will be saved at: %s\n", filepath.Clean(fullPath))
+
 	// Calculate summary statistics
 	summary := calculateSummary(findings)
-	
+
 	const tpl = `
 <!DOCTYPE html>
 <html lang="en">
@@ -602,13 +603,13 @@ func WriteUnifiedReport(findings []UnifiedFinding, filename string, target strin
 		"add":         func(a, b int) int { return a + b },
 		"vulnExplain": vulnDetails,
 	}
-	
+
 	t := template.New("unified_report").Funcs(funcMap)
 	t, err = t.Parse(tpl)
 	if err != nil {
-		return fmt.Errorf("template parse error: %w", err)
+		return "", fmt.Errorf("template parse error: %w", err)
 	}
-	
+
 	data := struct {
 		GeneratedAt string
 		Target      string
@@ -620,13 +621,14 @@ func WriteUnifiedReport(findings []UnifiedFinding, filename string, target strin
 		Findings:    findings,
 		Summary:     summary,
 	}
-	
+
 	if err := t.Execute(f, data); err != nil {
-		return fmt.Errorf("template execution failed: %w", err)
+		return "", fmt.Errorf("template execution failed: %w", err)
 	}
-	
-	fmt.Printf("[+] Unified report saved to: %s\n", fullPath)
-	return nil
+
+	cleanPath := filepath.Clean(fullPath)
+	fmt.Printf("[+] Unified report saved to: %s\n", cleanPath)
+	return cleanPath, nil
 }
 
 // calculateSummary generates statistics from findings
@@ -638,7 +640,7 @@ func calculateSummary(findings []UnifiedFinding) map[string]int {
 		"Medium":   0,
 		"Low":      0,
 	}
-	
+
 	for _, f := range findings {
 		switch f.Severity {
 		case "Critical":
@@ -651,6 +653,6 @@ func calculateSummary(findings []UnifiedFinding) map[string]int {
 			summary["Low"]++
 		}
 	}
-	
+
 	return summary
 }

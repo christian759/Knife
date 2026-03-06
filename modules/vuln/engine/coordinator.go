@@ -17,12 +17,12 @@ type ScanConfig struct {
 	MaxPages        int
 	MaxDepth        int
 	Throttle        time.Duration
-	
+
 	// Advanced Options
-	Intensity       int               // 1-5, controls payload variety and depth
-	CustomPayloads  map[string][]string // ScannerType -> Payloads
-	ScannerOptions  map[string]string   // Arbitrary per-scanner options
-	TargetedCVEs    []string          // List of CVE IDs to focus on
+	Intensity      int                 // 1-5, controls payload variety and depth
+	CustomPayloads map[string][]string // ScannerType -> Payloads
+	ScannerOptions map[string]string   // Arbitrary per-scanner options
+	TargetedCVEs   []string            // List of CVE IDs to focus on
 }
 
 // ScanResult holds the results of a complete vulnerability scan
@@ -58,10 +58,11 @@ func NewScannerCoordinator(config ScanConfig) *ScannerCoordinator {
 // RunAllScans executes all enabled scanners and aggregates results
 func (sc *ScannerCoordinator) RunAllScans() (*ScanResult, error) {
 	startTime := time.Now()
-	
+	defer close(sc.progressChan)
+
 	fmt.Printf("[+] Starting vulnerability scan on: %s\n", sc.config.Target)
 	fmt.Printf("[+] Enabled scanners: %d\n", len(sc.config.EnabledScanners))
-	
+
 	// Run each scanner
 	for _, scannerType := range sc.config.EnabledScanners {
 		if err := sc.runScanner(scannerType); err != nil {
@@ -71,12 +72,12 @@ func (sc *ScannerCoordinator) RunAllScans() (*ScanResult, error) {
 			sc.updateProgress(scannerType, "completed", 0, nil)
 		}
 	}
-	
+
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
-	
+
 	fmt.Printf("\n[+] Scan complete! Found %d vulnerabilities in %v\n", len(sc.findings), duration)
-	
+
 	return &ScanResult{
 		Target:         sc.config.Target,
 		Findings:       sc.findings,
@@ -91,7 +92,7 @@ func (sc *ScannerCoordinator) RunAllScans() (*ScanResult, error) {
 func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 	fmt.Printf("[*] Running %s scanner...\n", scannerType)
 	sc.updateProgress(scannerType, "running", 0, nil)
-	
+
 	switch scannerType {
 	case ScannerXSS:
 		return sc.runXSSScanner()
@@ -126,20 +127,20 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) error {
 
 // SQL Scanner
 func (sc *ScannerCoordinator) runSQLScanner() error {
-	scanner, err := scanners.NewSQLScanner(sc.config.Target, sc.config.Workers, 
+	scanner, err := scanners.NewSQLScanner(sc.config.Target, sc.config.Workers,
 		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle,
 		sc.config.Intensity, sc.config.CustomPayloads[string(ScannerSQL)])
 	if err != nil {
 		return err
 	}
-	
+
 	scanner.Run()
-	
+
 	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertSQLFinding(f))
 	}
-	
+
 	fmt.Printf("[✓] SQL Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
@@ -179,39 +180,39 @@ func (sc *ScannerCoordinator) runNetworkScanner() error {
 
 // XSS Scanner
 func (sc *ScannerCoordinator) runXSSScanner() error {
-	scanner, err := scanners.NewScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, 
+	scanner, err := scanners.NewScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages,
 		sc.config.MaxDepth, sc.config.Intensity, false, sc.config.Throttle,
 		sc.config.CustomPayloads[string(ScannerXSS)])
 	if err != nil {
 		return err
 	}
-	
+
 	scanner.Run()
-	
+
 	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertXSSFinding(f))
 	}
-	
+
 	fmt.Printf("[✓] XSS Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
 
 // CSRF Scanner
 func (sc *ScannerCoordinator) runCSRFScanner() error {
-	scanner, err := scanners.NewCSRFScanner(sc.config.Target, sc.config.Workers, 
+	scanner, err := scanners.NewCSRFScanner(sc.config.Target, sc.config.Workers,
 		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.config.Intensity, sc.config.TargetedCVEs)
 	if err != nil {
 		return err
 	}
-	
+
 	scanner.Run()
-	
+
 	// Convert findings
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertCSRFFinding(f))
 	}
-	
+
 	fmt.Printf("[✓] CSRF Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
 	return nil
 }
@@ -325,16 +326,16 @@ func (sc *ScannerCoordinator) addFinding(f UnifiedFinding) {
 func (sc *ScannerCoordinator) updateProgress(scannerType ScannerType, status string, count int, err error) {
 	sc.resultsMu.Lock()
 	defer sc.resultsMu.Unlock()
-	
+
 	progress := &ScanProgress{
 		ScannerName:   string(scannerType),
 		Status:        status,
 		FindingsCount: count,
 		Error:         err,
 	}
-	
+
 	sc.scannerResults[scannerType] = progress
-	
+
 	// Send to progress channel for TUI updates
 	select {
 	case sc.progressChan <- *progress:
@@ -358,21 +359,21 @@ func (sc *ScannerCoordinator) GetProgressChannel() <-chan ScanProgress {
 func (sc *ScannerCoordinator) GetSummary() map[string]int {
 	sc.findingsMu.Lock()
 	defer sc.findingsMu.Unlock()
-	
+
 	summary := make(map[string]int)
 	severityCounts := make(map[string]int)
-	
+
 	for _, f := range sc.findings {
 		summary[f.Type]++
 		severityCounts[f.Severity]++
 	}
-	
+
 	// Add severity counts
 	summary["Critical"] = severityCounts["Critical"]
 	summary["High"] = severityCounts["High"]
 	summary["Medium"] = severityCounts["Medium"]
 	summary["Low"] = severityCounts["Low"]
 	summary["Total"] = len(sc.findings)
-	
+
 	return summary
 }
