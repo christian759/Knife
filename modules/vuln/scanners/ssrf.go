@@ -48,6 +48,7 @@ type SSRFScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // ssrfCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type ssrfCrawlJob struct {
 	Depth int
 }
 
-func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*SSRFScanner, error) {
+func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*SSRFScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time
 	}
 
 	payloads := generateSSRFPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterSSRFPayloads(payloads, subtype)
 
 	s := &SSRFScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewSSRFScanner(start string, workers, maxPages, maxDepth int, throttle time
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterSSRFPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "metadata":
+			if containsAnyFold(p, "169.254.169.254", "metadata.google.internal", "latest/meta-data", "computeMetadata") {
+				out = append(out, p)
+			}
+		case "localhost":
+			if containsAnyFold(p, "127.0.0.1", "localhost", "[::1]", "0.0.0.0") {
+				out = append(out, p)
+			}
+		case "internal_services":
+			if containsAnyFold(p, ":2375", ":3306", ":6379", "gopher://", "10.", "172.", "192.168") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -229,6 +262,7 @@ func (s *SSRFScanner) fuzzURL(rawURL string) {
 }
 
 func (s *SSRFScanner) detectSSRF(body string) (string, bool) {
+	subtype := normalizeSubtype(s.Subtype)
 	signatures := []struct {
 		Pattern *regexp.Regexp
 		Name    string
@@ -245,6 +279,12 @@ func (s *SSRFScanner) detectSSRF(body string) (string, bool) {
 	}
 
 	for _, sig := range signatures {
+		if subtype == "metadata" && !containsAnyFold(sig.Name, "metadata") {
+			continue
+		}
+		if subtype == "localhost" && !containsAnyFold(sig.Name, "ssh", "mysql", "connection refused", "network unreachable") {
+			continue
+		}
 		if sig.Pattern.MatchString(body) {
 			match := sig.Pattern.FindString(body)
 			return fmt.Sprintf("Matched signature: %s (%s)", sig.Name, match), true

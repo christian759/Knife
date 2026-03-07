@@ -1,0 +1,2727 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>Comprehensive Vulnerability Scan Report</title>
+		<style>
+			* { margin: 0; padding: 0; box-sizing: border-box; }
+			body { 
+				font-family: 'Courier New', Courier, monospace; 
+				background: #0d0208;
+				color: #00ff41;
+				padding: 20px;
+				min-height: 100vh;
+			}
+			.container {
+				max-width: 1200px;
+				margin: 0 auto;
+				background: #000;
+				border: 1px solid #00ff41;
+				border-radius: 4px;
+				box-shadow: 0 0 20px #00ff4155;
+				overflow: hidden;
+			}
+			.header {
+				background: #000;
+				border-bottom: 2px solid #ff0000;
+				color: #ff0000;
+				padding: 40px;
+				text-align: center;
+				text-transform: uppercase;
+				letter-spacing: 4px;
+			}
+			.header h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 0 0 10px #ff000055; }
+			.header p { opacity: 0.9; font-size: 1.1em; color: #00ff41; }
+			.summary {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 20px;
+				padding: 30px 40px;
+				background: #050505;
+				border-bottom: 1px solid #00ff41;
+			}
+			.summary-card {
+				background: #000;
+				padding: 20px;
+				border: 1px solid #00ff41;
+				border-radius: 4px;
+				text-align: center;
+				transition: all 0.2s;
+			}
+			.summary-card:hover { border-color: #ff0000; box-shadow: 0 0 10px #ff000055; }
+			.summary-card h3 { font-size: 2.5em; margin-bottom: 5px; }
+			.summary-card p { color: #00ff41; font-size: 0.9em; text-transform: uppercase; }
+			.critical { color: #ff0000; border-color: #ff0000 !important; }
+			.high { color: #e67e22; }
+			.medium { color: #f1c40f; }
+			.low { color: #3498db; }
+			.findings {
+				padding: 40px;
+			}
+			.finding-card {
+				background: #050505;
+				border: 1px solid #00ff41;
+				padding: 25px;
+				margin-bottom: 30px;
+				box-shadow: 5px 5px 0px #00ff4122;
+			}
+			.finding-card.severity-Critical { border-color: #ff0000; box-shadow: 5px 5px 0px #ff000022; }
+			.finding-card.severity-High { border-color: #e67e22; }
+			.finding-card.severity-Medium { border-color: #f1c40f; }
+			.finding-card.severity-Low { border-color: #3498db; }
+			.finding-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 20px;
+				border-bottom: 1px solid #333;
+				padding-bottom: 10px;
+			}
+			.finding-title { font-size: 1.6em; color: #ff0000; font-weight: bold; }
+			.severity-badge {
+				padding: 4px 12px;
+				border-radius: 2px;
+				font-weight: bold;
+				font-size: 0.8em;
+				text-transform: uppercase;
+				border: 1px solid;
+			}
+			.severity-badge.Critical { color: #ff0000; border-color: #ff0000; }
+			.severity-badge.High { color: #e67e22; border-color: #e67e22; }
+			.severity-badge.Medium { color: #f1c40f; border-color: #f1c40f; }
+			.severity-badge.Low { color: #3498db; border-color: #3498db; }
+			.finding-details { margin: 15px 0; font-size: 0.95em; }
+			.detail-row {
+				display: grid;
+				grid-template-columns: 200px 1fr;
+				padding: 10px 0;
+				border-bottom: 1px solid #111;
+			}
+			.detail-label { font-weight: bold; color: #00ff41; opacity: 0.7; text-transform: uppercase; }
+			.detail-value { color: #00ff41; word-break: break-all; }
+			.evidence {
+				background: #000;
+				border: 1px dashed #00ff41;
+				padding: 15px;
+				font-family: 'Courier New', monospace;
+				white-space: pre-wrap;
+				overflow-x: auto;
+				margin-top: 15px;
+				font-size: 0.9em;
+				color: #00ff41;
+			}
+			.section-title {
+				font-size: 1.1em;
+				color: #ff0000;
+				margin-bottom: 8px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+			}
+			footer {
+				text-align: center;
+				padding: 40px;
+				background: #050505;
+				color: #444;
+				font-size: 0.8em;
+				border-top: 1px solid #111;
+			}
+			.timestamp { color: #333; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<h1>🔐 Vulnerability Scan Report</h1>
+				<p>Target: https://portal.unilorin.edu.ng</p>
+				<p>Generated: 07 Mar 2026 00:53:24 WAT</p>
+			</div>
+			
+			<div class="summary">
+				<div class="summary-card">
+					<h3>58</h3>
+					<p>Total Findings</p>
+				</div>
+				<div class="summary-card critical">
+					<h3>0</h3>
+					<p>Critical</p>
+				</div>
+				<div class="summary-card high">
+					<h3>46</h3>
+					<p>High</p>
+				</div>
+				<div class="summary-card medium">
+					<h3>3</h3>
+					<p>Medium</p>
+				</div>
+				<div class="summary-card low">
+					<h3>9</h3>
+					<p>Low</p>
+				</div>
+			</div>
+			
+			<div class="findings">
+				
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">1. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Content-Security-Policy is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">2. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Strict-Transport-Security is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">3. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Referrer-Policy is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">4. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Permissions-Policy is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">5. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Cross-Origin-Opener-Policy is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">6. Security Header Missing</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Cross-Origin-Resource-Policy is not set.</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">7. Cookie Security Misconfiguration</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Cookie missing one or more flags (Secure/HttpOnly/SameSite): XSRF-TOKEN=eyJpdiI6IjNVS1FQVDU4cEN3K0wyTzJqdU50b0E9PSIsInZhbHVlIjoiTkhOczZIZml4ZmQrR0Z1ME45RlFkNVM5a3VzVkFjYlVWdzNlS2ZoczBiU3p1bzYrTTJFTFlCOTI5dWdZY1FEQ2plckRaSEJoTUczbUh5VGdlUXdqemxKUlJLcGVJYzBwQlE2VkhCNU1iNzJzeXM5ZGNxUUhxOUZwSXgxcHFGN24iLCJtYWMiOiJiNjMwMjZjYWE3Y2NmODQ5MGNkYWY4YjVjZTU1ZDc1NmMxZWUzNTljYTJjM2Q0ZmM1MmYxZjM0MzgwM2NkNmNmIiwidGFnIjoiIn0%3D; expires=Sat, 07 Mar 2026 01:49:33 GMT; Max-Age=7200; path=/; domain=.portal.unilorin.edu.ng; samesite=lax</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">8. Cookie Security Misconfiguration</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Cookie missing one or more flags (Secure/HttpOnly/SameSite): unilorin_portal_session=eyJpdiI6IlFvTE5HVDIzbEJ4Y2pxWVN6UnJRdlE9PSIsInZhbHVlIjoiRnlvUmE5ZUNETFVSUGZSRU0zaE01OVBPQ25sZzVsaURwS3NHUFJmU2xXYlVlSmhiTEd0RW0wS2c2TWtJc1IrRTA1SnVQUlFOeVREVUhRUVloeHFXUnZ5WmNKSUZsZEF3dlVPTjhhcjRSS2srZlVCOUtscTRpQlFqYUxQS3k4VXMiLCJtYWMiOiIwYzM4ZWFiYTEyMDkyMGE0OTc1MGU2YTVkZjkxNGUxMzkxMzNkNTA0ZDI3ZGIyMGUwODkxNDNmMmUwMTg3NDc1IiwidGFnIjoiIn0%3D; expires=Sat, 07 Mar 2026 01:49:33 GMT; Max-Age=7200; path=/; domain=.portal.unilorin.edu.ng; httponly; samesite=lax</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Low">
+					<div class="finding-header">
+						<div class="finding-title">9. Information Disclosure</div>
+						<span class="severity-badge Low">Low</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Security Header</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng">https://portal.unilorin.edu.ng</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:33</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>HTTP Security Headers (like CSP, HSTS, XFO) are missing or misconfigured, weakening the browser&#39;s ability to protect the user.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Lack of headers makes it easier to perform Clickjacking, XSS, or downgrade attacks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Use browser developer tools or &#39;curl -I&#39; to inspect server response headers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Configure the web server to send appropriate security headers in all responses.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">Server header reveals version: nginx</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">10. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.git/config">https://portal.unilorin.edu.ng/.git/config</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:34</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.git/config</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">11. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.git/HEAD">https://portal.unilorin.edu.ng/.git/HEAD</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:35</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.git/HEAD</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">12. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.git/logs/HEAD">https://portal.unilorin.edu.ng/.git/logs/HEAD</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:35</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.git/logs/HEAD</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">13. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env">https://portal.unilorin.edu.ng/.env</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:35</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">14. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env.local">https://portal.unilorin.edu.ng/.env.local</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:36</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env.local</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">15. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env.production">https://portal.unilorin.edu.ng/.env.production</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:36</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env.production</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">16. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env.dev">https://portal.unilorin.edu.ng/.env.dev</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:36</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env.dev</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">17. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env.backup">https://portal.unilorin.edu.ng/.env.backup</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:36</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env.backup</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">18. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.env.example">https://portal.unilorin.edu.ng/.env.example</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:37</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.env.example</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">19. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.aws/credentials">https://portal.unilorin.edu.ng/.aws/credentials</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:37</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.aws/credentials</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">20. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.docker/config.json">https://portal.unilorin.edu.ng/.docker/config.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:37</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.docker/config.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">21. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.npmrc">https://portal.unilorin.edu.ng/.npmrc</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:38</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.npmrc</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">22. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.pypirc">https://portal.unilorin.edu.ng/.pypirc</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:38</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.pypirc</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">23. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/id_rsa">https://portal.unilorin.edu.ng/id_rsa</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:38</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /id_rsa</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">24. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/id_rsa.pub">https://portal.unilorin.edu.ng/id_rsa.pub</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:39</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /id_rsa.pub</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">25. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/config.php.bak">https://portal.unilorin.edu.ng/config.php.bak</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:39</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /config.php.bak</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">26. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/config.json">https://portal.unilorin.edu.ng/config.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:40</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /config.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">27. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/appsettings.json">https://portal.unilorin.edu.ng/appsettings.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:40</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /appsettings.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">28. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/application.properties">https://portal.unilorin.edu.ng/application.properties</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:40</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /application.properties</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">29. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/application.yml">https://portal.unilorin.edu.ng/application.yml</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:41</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /application.yml</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">30. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/wp-config.php.bak">https://portal.unilorin.edu.ng/wp-config.php.bak</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:41</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /wp-config.php.bak</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">31. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/web.config">https://portal.unilorin.edu.ng/web.config</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:42</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /web.config</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">32. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.htaccess">https://portal.unilorin.edu.ng/.htaccess</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:42</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.htaccess</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">33. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/composer.json">https://portal.unilorin.edu.ng/composer.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:42</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /composer.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">34. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/package.json">https://portal.unilorin.edu.ng/package.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:42</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /package.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">35. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/yarn.lock">https://portal.unilorin.edu.ng/yarn.lock</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:43</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /yarn.lock</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">36. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/pnpm-lock.yaml">https://portal.unilorin.edu.ng/pnpm-lock.yaml</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:43</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /pnpm-lock.yaml</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">37. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/phpinfo.php">https://portal.unilorin.edu.ng/phpinfo.php</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /phpinfo.php</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">38. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/server-status">https://portal.unilorin.edu.ng/server-status</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /server-status</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">39. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/server-info">https://portal.unilorin.edu.ng/server-info</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:45</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /server-info</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">40. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/robots.txt">https://portal.unilorin.edu.ng/robots.txt</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:45</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=High | Matched content signature &#34;user-agent&#34; at /robots.txt</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">41. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/sitemap.xml">https://portal.unilorin.edu.ng/sitemap.xml</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:45</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /sitemap.xml</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">42. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.svn/entries">https://portal.unilorin.edu.ng/.svn/entries</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:46</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.svn/entries</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">43. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.gitignore">https://portal.unilorin.edu.ng/.gitignore</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:46</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.gitignore</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">44. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/swagger.json">https://portal.unilorin.edu.ng/swagger.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:46</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /swagger.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">45. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/openapi.json">https://portal.unilorin.edu.ng/openapi.json</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:47</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /openapi.json</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">46. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.well-known/security.txt">https://portal.unilorin.edu.ng/.well-known/security.txt</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:47</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /.well-known/security.txt</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">47. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/backup.sql">https://portal.unilorin.edu.ng/backup.sql</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:48</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /backup.sql</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">48. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/dump.sql">https://portal.unilorin.edu.ng/dump.sql</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:48</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /dump.sql</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">49. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/database.sql">https://portal.unilorin.edu.ng/database.sql</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:48</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /database.sql</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">50. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/db.sql">https://portal.unilorin.edu.ng/db.sql</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:49</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /db.sql</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">51. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/docker-compose.yml">https://portal.unilorin.edu.ng/docker-compose.yml</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:49</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | File path is sensitive and content differs from not-found baseline: /docker-compose.yml</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">52. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/Dockerfile">https://portal.unilorin.edu.ng/Dockerfile</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:49</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /dockerfile</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">53. Sensitive File Discovered</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/kubeconfig">https://portal.unilorin.edu.ng/kubeconfig</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:50</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Low | Potential sensitive path responded 200 OK at /kubeconfig</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">54. Sensitive Path Access Restricted</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Sensitive File</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="https://portal.unilorin.edu.ng/.DS_Store">https://portal.unilorin.edu.ng/.DS_Store</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:49:50</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Sensitive files (like .env, .git/config, backups) are publicly accessible, potentially leaking credentials or source code.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can extract database passwords, API keys, or intellectual property.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Attempt to access common sensitive paths directly via the browser.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict access to sensitive files using server configuration or move them outside the web root.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">confidence=Medium | Path exists but requires authorization: /.DS_Store</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">55. Priv-Esc Path: 22 (SSH)</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:22</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:53:24</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp banner=SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12 | SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12 | SSH endpoint detected risk=High (remote administration exposed) recommendation=Restrict administration interfaces to VPN/jump-host and enforce MFA/allowlists. priv_esc_path=true category=remote-admin</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">56. Open Port: 25 (SMTP)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:25</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:53:24</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp risk=Medium (legacy/auth-sensitive service exposed) recommendation=Confirm business need, then firewall or disable if unnecessary. category=network-service</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">57. Open Port: 80 (HTTP)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:80</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:53:24</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp risk=Medium (web attack surface exposed) recommendation=Run authenticated web testing and verify patch/WAF/TLS posture. category=web</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">58. Open Port: 443 (HTTPS)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:443</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 00:53:24</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp banner=HTTP status=400 server=nginx risk=Medium (web attack surface exposed) recommendation=Run authenticated web testing and verify patch/WAF/TLS posture. category=web</div>
+					
+				</div>
+				
+				
+			</div>
+			
+			<footer>
+				Generated by <strong>Knife Vulnerability Scanner</strong> — for ethical and educational use only.<br>
+				Learn. Investigate. Protect.
+			</footer>
+		</div>
+	</body>
+</html>

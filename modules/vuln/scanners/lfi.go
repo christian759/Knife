@@ -48,6 +48,7 @@ type LFIScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // lfiCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type lfiCrawlJob struct {
 	Depth int
 }
 
-func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*LFIScanner, error) {
+func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*LFIScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -69,6 +70,8 @@ func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.
 	}
 
 	payloads := generateLFIPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterLFIPayloads(payloads, subtype)
 
 	s := &LFIScanner{
 		StartURL:     parsed,
@@ -83,8 +86,38 @@ func NewLFIScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterLFIPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "wrapper_abuse":
+			if containsAnyFold(p, "php://", "file://", "expect://", "data://", "zip://") {
+				out = append(out, p)
+			}
+		case "sensitive_reads":
+			if containsAnyFold(p, "/etc/passwd", "shadow", ".env", "proc/self", "win.ini") {
+				out = append(out, p)
+			}
+		case "path_traversal":
+			if containsAnyFold(p, "../", "..\\", "%2e%2e", "%2f") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the LFI scanning process
@@ -408,7 +441,7 @@ func (s *LFIScanner) normalize(base, href string) (string, error) {
 func RunLFIScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting LFI Scanner on", target)
 
-	scanner, err := NewLFIScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
+	scanner, err := NewLFIScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil, "path_traversal")
 	if err != nil {
 		return err
 	}

@@ -43,6 +43,7 @@ type SQLScanner struct {
 	Throttle    time.Duration
 	Payloads    []string
 	Intensity   int
+	Subtype     string
 }
 
 type sqlCrawlJob struct {
@@ -50,7 +51,7 @@ type sqlCrawlJob struct {
 	Depth int
 }
 
-func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, customPayloads []string) (*SQLScanner, error) {
+func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, customPayloads []string, subtype string) (*SQLScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -95,6 +96,8 @@ func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		payloads = append(payloads, customPayloads...)
 	}
 	payloads = finalizeQueryPayloads(payloads, intensity)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterSQLPayloads(payloads, subtype)
 
 	s := &SQLScanner{
 		StartURL:  parsed,
@@ -108,8 +111,42 @@ func NewSQLScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Throttle:  throttle,
 		Payloads:  payloads,
 		Intensity: intensity,
+		Subtype:   subtype,
 	}
 	return s, nil
+}
+
+func filterSQLPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "time_based":
+			if containsAnyFold(p, "sleep(", "waitfor delay", "pg_sleep") {
+				out = append(out, p)
+			}
+		case "union_based":
+			if containsAnyFold(p, "union select", "order by", "group by") {
+				out = append(out, p)
+			}
+		case "stacked":
+			if containsAnyFold(p, ";", "sleep(", "waitfor delay", "pg_sleep") {
+				out = append(out, p)
+			}
+		case "error_based":
+			if !containsAnyFold(p, "sleep(", "waitfor delay", "pg_sleep") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 func (s *SQLScanner) Run() {
@@ -316,31 +353,37 @@ func (s *SQLScanner) testPOSTPayload(testURL, param, payload string, data url.Va
 }
 
 func (s *SQLScanner) checkResponse(testURL, param, payload string, resp *http.Response, body string, duration time.Duration) bool {
-	// 1. Error-based detection
-	errorPatterns := []string{
-		"sql syntax", "mysql_fetch_array", "ora-", "postgresql query failed",
-		"microsoft ole db provider for sql server", "incorrect syntax near",
-		"unclosed quotation mark", "jdbc driver", "sqlstate", "syntax error at or near",
-		"warning: mysql", "sqlite error", "native client", "odbc sql server driver",
-	}
-	bodyLower := strings.ToLower(body)
+	subtype := normalizeSubtype(s.Subtype)
+	allowError := subtype == "" || subtype == "error_based" || subtype == "union_based" || subtype == "stacked"
+	allowTime := subtype == "" || subtype == "time_based" || subtype == "stacked"
 
-	for _, pattern := range errorPatterns {
-		if strings.Contains(bodyLower, pattern) {
-			s.addFinding(FindingSQL{
-				Type:            "Error-based SQL Injection",
-				URL:             testURL,
-				Param:           param,
-				Payload:         payload,
-				Evidence:        pattern,
-				ResponseSnippet: snippetAround(bodyLower, pattern, 100),
-			})
-			return true
+	// 1. Error-based detection
+	if allowError {
+		errorPatterns := []string{
+			"sql syntax", "mysql_fetch_array", "ora-", "postgresql query failed",
+			"microsoft ole db provider for sql server", "incorrect syntax near",
+			"unclosed quotation mark", "jdbc driver", "sqlstate", "syntax error at or near",
+			"warning: mysql", "sqlite error", "native client", "odbc sql server driver",
+		}
+		bodyLower := strings.ToLower(body)
+
+		for _, pattern := range errorPatterns {
+			if strings.Contains(bodyLower, pattern) {
+				s.addFinding(FindingSQL{
+					Type:            "Error-based SQL Injection",
+					URL:             testURL,
+					Param:           param,
+					Payload:         payload,
+					Evidence:        pattern,
+					ResponseSnippet: snippetAround(bodyLower, pattern, 100),
+				})
+				return true
+			}
 		}
 	}
 
 	// 2. Time-based detection (if intensity > 3)
-	if s.Intensity > 3 {
+	if allowTime && s.Intensity > 3 {
 		// Threshold: If response is > 4.5 seconds for a payload that shouldn't take that long
 		if duration > 4500*time.Millisecond && (strings.Contains(payload, "SLEEP") || strings.Contains(payload, "DELAY") || strings.Contains(payload, "pg_sleep")) {
 			s.addFinding(FindingSQL{

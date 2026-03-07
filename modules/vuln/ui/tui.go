@@ -30,6 +30,7 @@ type vulnSessionState int
 
 const (
 	stateTarget vulnSessionState = iota
+	stateScope
 	stateScanners
 	stateConfig
 	stateScanning
@@ -48,23 +49,27 @@ type mainModel struct {
 	windowHeight int
 
 	// Data
-	targetURL          string
-	availableScanners  []engine.ScannerInfo
-	selected           map[engine.ScannerType]bool
-	scannerCursor      int
-	uiError            string
-	uiNotice           string
-	scannerStatus      map[string]string
-	scannerFindings    map[string]int
-	scannerModes       map[engine.ScannerType]string
-	scanStartedAt      time.Time
-	progressPercent    float64
-	lastProgressUpdate string
-	reportPath         string
-	activityLog        []string
-	scanDetailCursor   int
-	summaryCursor      int
-	showEvidence       bool
+	targetURL           string
+	availableScanners   []engine.ScannerInfo
+	selected            map[engine.ScannerType]bool
+	scannerCursor       int
+	scopeCursor         int
+	webModeSelected     bool
+	networkModeSelected bool
+	uiError             string
+	uiNotice            string
+	scannerStatus       map[string]string
+	scannerFindings     map[string]int
+	scannerModes        map[engine.ScannerType]string
+	scannerSubtypes     map[engine.ScannerType]string
+	scanStartedAt       time.Time
+	progressPercent     float64
+	lastProgressUpdate  string
+	reportPath          string
+	activityLog         []string
+	scanDetailCursor    int
+	summaryCursor       int
+	showEvidence        bool
 
 	// Scan settings
 	workers          int
@@ -117,33 +122,40 @@ func initialModel() mainModel {
 	scanners := engine.GetScannerInfo()
 	selected := make(map[engine.ScannerType]bool, len(scanners))
 	scannerModes := make(map[engine.ScannerType]string, len(scanners))
+	scannerSubtypes := make(map[engine.ScannerType]string, len(scanners))
 	for _, s := range scanners {
 		selected[s.Type] = true
 		scannerModes[s.Type] = "balanced"
+		if len(s.SubtypeOptions) > 0 {
+			scannerSubtypes[s.Type] = s.SubtypeOptions[0]
+		}
 	}
 
 	return mainModel{
-		state:              stateTarget,
-		targetInput:        ti,
-		configFields:       configFields,
-		progress:           p,
-		availableScanners:  scanners,
-		selected:           selected,
-		scannerModes:       scannerModes,
-		scannerStatus:      make(map[string]string),
-		scannerFindings:    make(map[string]int),
-		workers:            10,
-		intensity:          3,
-		depth:              2,
-		maxPages:           50,
-		throttleMS:         100,
-		networkProfile:     "infrastructure",
-		networkTimeoutMS:   2000,
-		networkDeepScan:    false,
-		progressPercent:    0,
-		lastProgressUpdate: "waiting",
-		activityLog:        []string{},
-		showEvidence:       true,
+		state:               stateTarget,
+		targetInput:         ti,
+		configFields:        configFields,
+		progress:            p,
+		availableScanners:   scanners,
+		selected:            selected,
+		scannerModes:        scannerModes,
+		scannerSubtypes:     scannerSubtypes,
+		scannerStatus:       make(map[string]string),
+		scannerFindings:     make(map[string]int),
+		webModeSelected:     true,
+		networkModeSelected: true,
+		workers:             10,
+		intensity:           3,
+		depth:               2,
+		maxPages:            50,
+		throttleMS:          100,
+		networkProfile:      "infrastructure",
+		networkTimeoutMS:    2000,
+		networkDeepScan:     false,
+		progressPercent:     0,
+		lastProgressUpdate:  "waiting",
+		activityLog:         []string{},
+		showEvidence:        true,
 	}
 }
 
@@ -207,6 +219,8 @@ func (m mainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateTarget:
 		return m.updateTarget(msg)
+	case stateScope:
+		return m.updateScope(msg)
 	case stateScanners:
 		return m.updateScanners(msg)
 	case stateConfig:
@@ -267,13 +281,122 @@ func (m mainModel) updateTarget(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.uiError = ""
 			m.uiNotice = ""
-			m.state = stateScanners
+			m.state = stateScope
 			return m, nil
 		}
 	}
 	var cmd tea.Cmd
 	m.targetInput, cmd = m.targetInput.Update(msg)
 	return m, cmd
+}
+
+func (m mainModel) scannerInActiveDomain(info engine.ScannerInfo) bool {
+	domain := strings.ToLower(strings.TrimSpace(info.Domain))
+	switch domain {
+	case "network":
+		return m.networkModeSelected
+	default:
+		return m.webModeSelected
+	}
+}
+
+func (m *mainModel) applyDomainSelectionToScanners() {
+	for _, info := range m.availableScanners {
+		m.selected[info.Type] = m.scannerInActiveDomain(info)
+	}
+	m.scannerCursor = m.firstVisibleScannerIndex()
+}
+
+func (m mainModel) firstVisibleScannerIndex() int {
+	for i, info := range m.availableScanners {
+		if m.scannerInActiveDomain(info) {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m mainModel) visibleScannerIndices() []int {
+	indices := make([]int, 0, len(m.availableScanners))
+	for i, info := range m.availableScanners {
+		if m.scannerInActiveDomain(info) {
+			indices = append(indices, i)
+		}
+	}
+	return indices
+}
+
+func (m *mainModel) moveScannerCursor(delta int) {
+	visible := m.visibleScannerIndices()
+	if len(visible) == 0 {
+		m.scannerCursor = 0
+		return
+	}
+	currentPos := 0
+	for i, idx := range visible {
+		if idx == m.scannerCursor {
+			currentPos = i
+			break
+		}
+	}
+	currentPos = (currentPos + delta + len(visible)) % len(visible)
+	m.scannerCursor = visible[currentPos]
+}
+
+func (m mainModel) updateScope(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if k, ok := msg.(tea.KeyMsg); ok {
+		switch k.String() {
+		case "esc":
+			return m, tea.Quit
+		case "b":
+			m.state = stateTarget
+			return m, nil
+		case "up", "k":
+			if m.scopeCursor > 0 {
+				m.scopeCursor--
+			}
+			return m, nil
+		case "down", "j":
+			if m.scopeCursor < 1 {
+				m.scopeCursor++
+			}
+			return m, nil
+		case " ":
+			if m.scopeCursor == 0 {
+				m.webModeSelected = !m.webModeSelected
+			} else {
+				m.networkModeSelected = !m.networkModeSelected
+			}
+			if !m.webModeSelected && !m.networkModeSelected {
+				m.uiError = "select at least one scan mode"
+			} else {
+				m.uiError = ""
+			}
+			return m, nil
+		case "a":
+			m.webModeSelected = true
+			m.networkModeSelected = true
+			m.uiError = ""
+			m.uiNotice = "both modes selected"
+			return m, nil
+		case "n":
+			m.webModeSelected = false
+			m.networkModeSelected = false
+			m.uiError = "select at least one scan mode"
+			return m, nil
+		case "enter":
+			if !m.webModeSelected && !m.networkModeSelected {
+				m.uiError = "select at least one scan mode"
+				return m, nil
+			}
+			m.applyDomainSelectionToScanners()
+			m.uiError = ""
+			m.uiNotice = ""
+			m.state = stateScanners
+			return m, nil
+		}
+	}
+	return m, nil
 }
 
 func scannerModeOptions(scannerType engine.ScannerType) []string {
@@ -315,7 +438,53 @@ func (m *mainModel) cycleScannerMode(scannerType engine.ScannerType, delta int) 
 	m.scannerModes[scannerType] = options[idx]
 }
 
+func (m *mainModel) cycleScannerSubtype(scannerType engine.ScannerType, delta int) {
+	var options []string
+	for _, info := range m.availableScanners {
+		if info.Type == scannerType {
+			options = info.SubtypeOptions
+			break
+		}
+	}
+	if len(options) == 0 {
+		return
+	}
+	current := strings.ToLower(strings.TrimSpace(m.scannerSubtypes[scannerType]))
+	if current == "" {
+		current = options[0]
+	}
+	idx := 0
+	for i := range options {
+		if options[i] == current {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + len(options)) % len(options)
+	m.scannerSubtypes[scannerType] = options[idx]
+}
+
 func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
+	visible := m.visibleScannerIndices()
+	if len(visible) == 0 {
+		m.uiError = "no scanners available for selected scan mode(s)"
+		if k, ok := msg.(tea.KeyMsg); ok && k.String() == "b" {
+			m.state = stateScope
+			return m, nil
+		}
+		return m, nil
+	}
+	isVisible := false
+	for _, idx := range visible {
+		if idx == m.scannerCursor {
+			isVisible = true
+			break
+		}
+	}
+	if !isVisible {
+		m.scannerCursor = visible[0]
+	}
+
 	if len(m.availableScanners) == 0 {
 		m.uiError = "no scanners available"
 		return m, nil
@@ -326,14 +495,10 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			return m, tea.Quit
 		case "up", "k":
-			if m.scannerCursor > 0 {
-				m.scannerCursor--
-			}
+			m.moveScannerCursor(-1)
 			return m, nil
 		case "down", "j":
-			if m.scannerCursor < len(m.availableScanners)-1 {
-				m.scannerCursor++
-			}
+			m.moveScannerCursor(1)
 			return m, nil
 		case " ":
 			cur := m.availableScanners[m.scannerCursor]
@@ -347,6 +512,18 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.uiNotice = fmt.Sprintf("%s mode -> %s", cur.Type, m.scannerModes[cur.Type])
 			m.uiError = ""
 			return m, nil
+		case "y":
+			cur := m.availableScanners[m.scannerCursor]
+			m.cycleScannerSubtype(cur.Type, 1)
+			m.uiNotice = fmt.Sprintf("%s subtype -> %s", cur.Type, m.scannerSubtypes[cur.Type])
+			m.uiError = ""
+			return m, nil
+		case "Y":
+			cur := m.availableScanners[m.scannerCursor]
+			m.cycleScannerSubtype(cur.Type, -1)
+			m.uiNotice = fmt.Sprintf("%s subtype -> %s", cur.Type, m.scannerSubtypes[cur.Type])
+			m.uiError = ""
+			return m, nil
 		case "left", "h":
 			cur := m.availableScanners[m.scannerCursor]
 			m.cycleScannerMode(cur.Type, -1)
@@ -358,17 +535,19 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.uiNotice = fmt.Sprintf("%s mode -> %s", cur.Type, m.scannerModes[cur.Type])
 			return m, nil
 		case "a":
-			for _, s := range m.availableScanners {
+			for _, idx := range visible {
+				s := m.availableScanners[idx]
 				m.selected[s.Type] = true
 			}
-			m.uiNotice = "all scanners selected"
+			m.uiNotice = "all visible scanners selected"
 			m.uiError = ""
 			return m, nil
 		case "n":
-			for _, s := range m.availableScanners {
+			for _, idx := range visible {
+				s := m.availableScanners[idx]
 				m.selected[s.Type] = false
 			}
-			m.uiNotice = "all scanners cleared"
+			m.uiNotice = "all visible scanners cleared"
 			m.uiError = ""
 			return m, nil
 		case "1":
@@ -381,17 +560,18 @@ func (m mainModel) updateScanners(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.applyPreset("full")
 			return m, nil
 		case "i":
-			for _, s := range m.availableScanners {
+			for _, idx := range visible {
+				s := m.availableScanners[idx]
 				m.selected[s.Type] = !m.selected[s.Type]
 			}
 			m.uiNotice = "selection inverted"
 			m.uiError = ""
 			return m, nil
 		case "b":
-			m.state = stateTarget
+			m.state = stateScope
 			return m, nil
 		case "enter":
-			if m.selectedCount() == 0 {
+			if m.selectedVisibleCount() == 0 {
 				m.uiError = "select at least one scanner before continuing"
 				return m, nil
 			}
@@ -410,12 +590,19 @@ func (m *mainModel) applyPreset(preset string) {
 	for _, s := range m.availableScanners {
 		m.selected[s.Type] = false
 		m.scannerModes[s.Type] = "balanced"
+		if len(s.SubtypeOptions) > 0 {
+			m.scannerSubtypes[s.Type] = s.SubtypeOptions[0]
+		}
 	}
 
 	switch preset {
 	case "web":
+		if !m.webModeSelected {
+			m.uiError = "web mode is not selected"
+			return
+		}
 		for _, s := range m.availableScanners {
-			if s.Type != engine.ScannerNetwork {
+			if strings.ToLower(strings.TrimSpace(s.Domain)) == "web" {
 				m.selected[s.Type] = true
 			}
 		}
@@ -424,6 +611,10 @@ func (m *mainModel) applyPreset(preset string) {
 		m.scannerModes[engine.ScannerCSRF] = "deep"
 		m.uiNotice = "preset applied: web app focus"
 	case "network":
+		if !m.networkModeSelected {
+			m.uiError = "network mode is not selected"
+			return
+		}
 		enabled := map[engine.ScannerType]bool{
 			engine.ScannerNetwork:          true,
 			engine.ScannerSSRF:             true,
@@ -434,7 +625,7 @@ func (m *mainModel) applyPreset(preset string) {
 			engine.ScannerFiles:            true,
 		}
 		for _, s := range m.availableScanners {
-			if enabled[s.Type] {
+			if enabled[s.Type] && m.scannerInActiveDomain(s) {
 				m.selected[s.Type] = true
 			}
 		}
@@ -445,7 +636,9 @@ func (m *mainModel) applyPreset(preset string) {
 		m.uiNotice = "preset applied: network and privilege-escalation focus"
 	default:
 		for _, s := range m.availableScanners {
-			m.selected[s.Type] = true
+			if m.scannerInActiveDomain(s) {
+				m.selected[s.Type] = true
+			}
 			m.scannerModes[s.Type] = "aggressive"
 		}
 		m.scannerModes[engine.ScannerNetwork] = "deep"
@@ -456,6 +649,7 @@ func (m *mainModel) applyPreset(preset string) {
 
 func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
+		handledNav := false
 		switch k.String() {
 		case "esc":
 			return m, tea.Quit
@@ -464,8 +658,10 @@ func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "up", "shift+tab":
 			m.focusedField--
+			handledNav = true
 		case "down", "tab":
 			m.focusedField++
+			handledNav = true
 		case "left", "h":
 			if m.configFields[m.focusedField].key == "network_profile" {
 				m.cycleNetworkProfile(-1)
@@ -485,24 +681,27 @@ func (m mainModel) updateConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.startScan()
 			}
 			m.focusedField++
+			handledNav = true
 		}
 
-		if m.focusedField < 0 {
-			m.focusedField = len(m.configFields) - 1
-		} else if m.focusedField >= len(m.configFields) {
-			m.focusedField = 0
-		}
-
-		cmds := make([]tea.Cmd, len(m.configFields))
-		for i := range m.configFields {
-			if i == m.focusedField {
-				cmds[i] = m.configFields[i].input.Focus()
-			} else {
-				m.configFields[i].input.Blur()
+		if handledNav {
+			if m.focusedField < 0 {
+				m.focusedField = len(m.configFields) - 1
+			} else if m.focusedField >= len(m.configFields) {
+				m.focusedField = 0
 			}
+
+			cmds := make([]tea.Cmd, len(m.configFields))
+			for i := range m.configFields {
+				if i == m.focusedField {
+					cmds[i] = m.configFields[i].input.Focus()
+				} else {
+					m.configFields[i].input.Blur()
+				}
+			}
+			m.parseConfigValues()
+			return m, tea.Batch(cmds...)
 		}
-		m.parseConfigValues()
-		return m, tea.Batch(cmds...)
 	}
 
 	var cmd tea.Cmd
@@ -664,6 +863,10 @@ func (m mainModel) startScan() (tea.Model, tea.Cmd) {
 			mode = "balanced"
 		}
 		scannerOptions["mode_"+string(s.Type)] = mode
+		subtype := strings.TrimSpace(strings.ToLower(m.scannerSubtypes[s.Type]))
+		if subtype != "" {
+			scannerOptions["subtype_"+string(s.Type)] = subtype
+		}
 	}
 	if m.networkSelected() {
 		scannerOptions["network_profile"] = networkProfile
@@ -721,6 +924,16 @@ func (m mainModel) selectedCount() int {
 	count := 0
 	for _, s := range m.availableScanners {
 		if m.selected[s.Type] {
+			count++
+		}
+	}
+	return count
+}
+
+func (m mainModel) selectedVisibleCount() int {
+	count := 0
+	for _, idx := range m.visibleScannerIndices() {
+		if m.selected[m.availableScanners[idx].Type] {
 			count++
 		}
 	}
@@ -863,6 +1076,7 @@ func (m mainModel) scannerSeverityStyle(sev string) lipgloss.Style {
 func (m mainModel) renderTopBar() string {
 	stage := map[vulnSessionState]string{
 		stateTarget:   "Target",
+		stateScope:    "Mode",
 		stateScanners: "Scanners",
 		stateConfig:   "Config",
 		stateScanning: "Scanning",
@@ -871,6 +1085,19 @@ func (m mainModel) renderTopBar() string {
 
 	left := fmt.Sprintf("Stage: %s", stage)
 	right := fmt.Sprintf("Selected: %d/%d", m.selectedCount(), len(m.availableScanners))
+	if m.state == stateScope {
+		modeCount := 0
+		if m.webModeSelected {
+			modeCount++
+		}
+		if m.networkModeSelected {
+			modeCount++
+		}
+		right = fmt.Sprintf("Modes: %d/2", modeCount)
+	}
+	if m.state == stateScanners {
+		right = fmt.Sprintf("Selected: %d/%d visible", m.selectedVisibleCount(), len(m.visibleScannerIndices()))
+	}
 	if m.state == stateScanning {
 		right = fmt.Sprintf("Progress: %d%%", int(m.progressPercent*100))
 	}
@@ -884,15 +1111,56 @@ func (m mainModel) renderTopBar() string {
 	return tui.RenderBox(line)
 }
 
+func (m mainModel) renderScope() string {
+	var b strings.Builder
+	b.WriteString(tui.RenderTitle("Scan Mode Selection"))
+	b.WriteString("\n\n")
+	b.WriteString("Choose scan domains (you can select one or both):\n\n")
+
+	webCursor := " "
+	if m.scopeCursor == 0 {
+		webCursor = ">"
+	}
+	webCheck := "[ ]"
+	if m.webModeSelected {
+		webCheck = "[x]"
+	}
+	b.WriteString(fmt.Sprintf("%s %s Web Vulnerability Mode\n", webCursor, webCheck))
+	b.WriteString("    Includes application vulnerability scanners and web misconfiguration checks.\n\n")
+
+	netCursor := " "
+	if m.scopeCursor == 1 {
+		netCursor = ">"
+	}
+	netCheck := "[ ]"
+	if m.networkModeSelected {
+		netCheck = "[x]"
+	}
+	b.WriteString(fmt.Sprintf("%s %s Network Exposure Mode\n", netCursor, netCheck))
+	b.WriteString("    Includes infrastructure port/service discovery and privilege-escalation path checks.\n")
+
+	if m.uiError != "" {
+		b.WriteString("\n" + tui.RenderError(m.uiError))
+	} else if m.uiNotice != "" {
+		b.WriteString("\n" + tui.RenderInfo(m.uiNotice))
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | a: select both | n: clear | b: back | enter: continue | esc: quit"))
+	return b.String()
+}
+
 func (m mainModel) renderScannerPicker() string {
 	var list strings.Builder
 	list.WriteString(tui.RenderTitle("Scanner Selection"))
 	list.WriteString("\n")
-	list.WriteString(fmt.Sprintf("Selected: %d/%d\n\n", m.selectedCount(), len(m.availableScanners)))
+	visible := m.visibleScannerIndices()
+	list.WriteString(fmt.Sprintf("Selected: %d/%d visible scanners\n\n", m.selectedVisibleCount(), len(visible)))
 
-	for i, s := range m.availableScanners {
+	for _, idx := range visible {
+		s := m.availableScanners[idx]
 		cursor := " "
-		if i == m.scannerCursor {
+		if idx == m.scannerCursor {
 			cursor = ">"
 		}
 		check := "[ ]"
@@ -903,20 +1171,28 @@ func (m mainModel) renderScannerPicker() string {
 		if mode == "" {
 			mode = "balanced"
 		}
-		line := fmt.Sprintf("%s %s %-28s mode=%-10s ", cursor, check, s.Name, mode)
+		subtype := m.scannerSubtypes[s.Type]
+		if subtype == "" && len(s.SubtypeOptions) > 0 {
+			subtype = s.SubtypeOptions[0]
+		}
+		line := fmt.Sprintf("%s %s %-28s mode=%-10s subtype=%-18s ", cursor, check, s.Name, mode, subtype)
 		list.WriteString(line)
 		list.WriteString(m.scannerSeverityStyle(s.Severity).Render("[" + strings.ToUpper(s.Severity) + "]"))
 		list.WriteString("\n")
 	}
 
 	detail := ""
-	if len(m.availableScanners) > 0 {
+	if len(visible) > 0 {
 		current := m.availableScanners[m.scannerCursor]
 		mode := m.scannerModes[current.Type]
 		if mode == "" {
 			mode = "balanced"
 		}
-		detail = tui.RenderBox(fmt.Sprintf("Type: %s\nMode: %s\nGoal: %s\nMethod: %s\nMode effect: %s", current.Type, mode, current.Description, m.scannerMethod(string(current.Type)), scannerModeDescription(current.Type, mode)))
+		subtype := m.scannerSubtypes[current.Type]
+		if subtype == "" && len(current.SubtypeOptions) > 0 {
+			subtype = current.SubtypeOptions[0]
+		}
+		detail = tui.RenderBox(fmt.Sprintf("Type: %s\nDomain: %s\nFamily: %s\nSelected subtype: %s\nAvailable subtypes: %s\nMode: %s\nGoal: %s\nMethod: %s\nMode effect: %s", current.Type, strings.ToUpper(current.Domain), current.Subtype, subtype, strings.Join(current.SubtypeOptions, ", "), mode, current.Description, m.scannerMethod(string(current.Type)), scannerModeDescription(current.Type, mode)))
 	}
 
 	presets := tui.RenderBox("Presets\n1: Web App\n2: Network / Priv-Esc\n3: Full Coverage")
@@ -940,7 +1216,7 @@ func (m mainModel) renderScannerPicker() string {
 		footer.WriteString("\n" + tui.RenderInfo(m.uiNotice))
 	}
 	footer.WriteString("\n\n")
-	footer.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | t or h/l: cycle mode | 1/2/3: presets | a: all | n: none | i: invert | b: back | enter: continue | esc: quit"))
+	footer.WriteString(tui.RenderHelp("j/k or arrows: move | space: toggle | t or h/l: cycle mode | y/Y: cycle subtype | 1/2/3: presets | a: all visible | n: none visible | i: invert visible | b: back | enter: continue | esc: quit"))
 
 	return body + footer.String()
 }
@@ -949,6 +1225,7 @@ func (m mainModel) renderConfig() string {
 	var b strings.Builder
 	b.WriteString(tui.RenderTitle("Scan Configuration"))
 	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("Active modes: web=%t network=%t\n", m.webModeSelected, m.networkModeSelected))
 	if m.networkSelected() {
 		b.WriteString(tui.RenderInfo("Network scanner selected: architecture options will be applied."))
 	} else {
@@ -1003,7 +1280,11 @@ func (m mainModel) renderScanning() string {
 		if mode == "" {
 			mode = "balanced"
 		}
-		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d mode=%s\n", string(info.Type), status, findings, mode))
+		subtype := m.scannerSubtypes[info.Type]
+		if subtype == "" && len(info.SubtypeOptions) > 0 {
+			subtype = info.SubtypeOptions[0]
+		}
+		b.WriteString(fmt.Sprintf("- %-24s %s findings=%d mode=%s subtype=%s\n", string(info.Type), status, findings, mode, subtype))
 	}
 
 	selectedScanners := make([]engine.ScannerInfo, 0, len(m.availableScanners))
@@ -1024,8 +1305,14 @@ func (m mainModel) renderScanning() string {
 		if mode == "" {
 			mode = "balanced"
 		}
+		subtype := m.scannerSubtypes[cur.Type]
+		if subtype == "" && len(cur.SubtypeOptions) > 0 {
+			subtype = cur.SubtypeOptions[0]
+		}
 		b.WriteString("\nFocused scanner:\n")
 		b.WriteString(fmt.Sprintf("- %s (%s)\n", cur.Name, cur.Type))
+		b.WriteString(fmt.Sprintf("- family: %s\n", cur.Subtype))
+		b.WriteString(fmt.Sprintf("- selected subtype: %s\n", subtype))
 		b.WriteString(fmt.Sprintf("- mode: %s\n", mode))
 		b.WriteString(fmt.Sprintf("- technique: %s\n", m.scannerMethod(string(cur.Type))))
 		b.WriteString(fmt.Sprintf("- mode effect: %s\n", scannerModeDescription(cur.Type, mode)))
@@ -1162,6 +1449,8 @@ func (m mainModel) View() string {
 		}
 		s.WriteString("\n\n")
 		s.WriteString(tui.RenderHelp("enter: continue | esc: quit"))
+	case stateScope:
+		s.WriteString(m.renderScope())
 	case stateScanners:
 		s.WriteString(m.renderScannerPicker())
 	case stateConfig:

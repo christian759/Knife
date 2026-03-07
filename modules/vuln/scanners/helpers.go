@@ -7,6 +7,24 @@ import (
 	"strings"
 )
 
+func normalizeSubtype(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func containsAnyFold(s string, terms ...string) bool {
+	s = strings.ToLower(s)
+	for _, t := range terms {
+		t = strings.ToLower(strings.TrimSpace(t))
+		if t == "" {
+			continue
+		}
+		if strings.Contains(s, t) {
+			return true
+		}
+	}
+	return false
+}
+
 func snippet(s string, n int) string {
 	if len(s) <= n {
 		return s
