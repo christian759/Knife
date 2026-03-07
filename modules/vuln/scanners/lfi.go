@@ -284,6 +284,7 @@ func (s *LFIScanner) fuzzURL(rawURL string) {
 
 // detectLFI checks the response body for common LFI signatures
 func (s *LFIScanner) detectLFI(body string) (string, bool) {
+	subtype := normalizeSubtype(s.Subtype)
 	// Common indicators of successful LFI
 	signatures := []struct {
 		Pattern *regexp.Regexp
@@ -304,6 +305,12 @@ func (s *LFIScanner) detectLFI(body string) (string, bool) {
 	}
 
 	for _, sig := range signatures {
+		if subtype == "wrapper_abuse" && !containsAnyFold(sig.Name, "php", "base64", "proc", "warning") {
+			continue
+		}
+		if subtype == "sensitive_reads" && !containsAnyFold(sig.Name, "passwd", "win.ini", "shadow") {
+			continue
+		}
 		if sig.Pattern.MatchString(body) {
 			match := sig.Pattern.FindString(body)
 			return fmt.Sprintf("Matched signature: %s (%s)", sig.Name, match), true

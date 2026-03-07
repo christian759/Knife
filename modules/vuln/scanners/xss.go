@@ -64,6 +64,7 @@ type XSSScanner struct {
 	PayloadsFull  []string
 	Intensity     int
 	Throttle      time.Duration
+	Subtype       string
 }
 
 // crawlJob for queue
@@ -110,12 +111,12 @@ func defaultPayloads() ([]string, []string) {
 }
 
 // NewScanner creates an XSSScanner configured for the requested target.
-func NewScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string) (*XSSScanner, error) {
-	return newScanner(start, workers, maxPages, maxDepth, intensity, useChrome, throttle, customPayloads)
+func NewScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string, subtype string) (*XSSScanner, error) {
+	return newScanner(start, workers, maxPages, maxDepth, intensity, useChrome, throttle, customPayloads, subtype)
 }
 
 // newScanner contains the shared construction logic for XSS scanners.
-func newScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string) (*XSSScanner, error) {
+func newScanner(start string, workers, maxPages, maxDepth int, intensity int, useChrome bool, throttle time.Duration, customPayloads []string, subtype string) (*XSSScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -134,6 +135,7 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity int, us
 		UseChrome: useChrome,
 		Intensity: intensity,
 		Throttle:  throttle,
+		Subtype:   normalizeSubtype(subtype),
 	}
 	basic, full := defaultPayloads()
 	s.PayloadsBasic = basic
@@ -142,6 +144,14 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity int, us
 	if len(customPayloads) > 0 {
 		s.PayloadsFull = append(s.PayloadsFull, customPayloads...)
 	}
+	switch s.Subtype {
+	case "reflected":
+		s.PayloadsFull = filterXSSPayloads(s.PayloadsFull, "reflected")
+	case "stored":
+		s.PayloadsFull = filterXSSPayloads(s.PayloadsFull, "stored")
+	case "dom":
+		s.PayloadsFull = filterXSSPayloads(s.PayloadsFull, "dom")
+	}
 
 	if useChrome {
 		ctx, cancel := chromedp.NewContext(context.Background())
@@ -149,6 +159,32 @@ func newScanner(start string, workers, maxPages, maxDepth int, intensity int, us
 		s.ChromeCancel = cancel
 	}
 	return s, nil
+}
+
+func filterXSSPayloads(payloads []string, subtype string) []string {
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "dom":
+			if containsAnyFold(p, "javascript:", "onload", "onerror", "srcdoc", "onmouseover") {
+				out = append(out, p)
+			}
+		case "stored":
+			if containsAnyFold(p, "<script", "<img", "<svg") {
+				out = append(out, p)
+			}
+		case "reflected":
+			if !containsAnyFold(p, "javascript:") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // add finding
@@ -542,7 +578,9 @@ func (s *XSSScanner) worker(wg *sync.WaitGroup) {
 			continue
 		}
 		// analyze stored markers
-		s.analyzeForStoredMarkers(job.URL, body)
+		if s.Subtype == "" || s.Subtype == "stored" || s.Subtype == "full" {
+			s.analyzeForStoredMarkers(job.URL, body)
+		}
 
 		// quick raw payload detection (non-marked)
 		for _, p := range append(s.PayloadsBasic, s.PayloadsFull...) {
@@ -577,15 +615,19 @@ func (s *XSSScanner) worker(wg *sync.WaitGroup) {
 					}
 				})
 				// forms
-				s.fuzzForms(job.URL, body)
+				if s.Subtype == "" || s.Subtype == "reflected" || s.Subtype == "stored" || s.Subtype == "full" {
+					s.fuzzForms(job.URL, body)
+				}
 			}
 		}
 
 		// fuzz URL params
-		s.fuzzParams(job.URL)
+		if s.Subtype == "" || s.Subtype == "reflected" || s.Subtype == "full" {
+			s.fuzzParams(job.URL)
+		}
 
 		// optional DOM check
-		if s.UseChrome && strings.Contains(strings.ToLower(ctype), "text/html") {
+		if s.UseChrome && (s.Subtype == "" || s.Subtype == "dom" || s.Subtype == "full") && strings.Contains(strings.ToLower(ctype), "text/html") {
 			s.domCheck(job.URL)
 		}
 		atomic.AddInt32(&s.Active, -1)

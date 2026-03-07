@@ -22,13 +22,15 @@ type HeadersScanner struct {
 	Target   string
 	Client   *http.Client
 	Findings []FindingHeader
+	Subtype  string
 }
 
 // NewHeadersScanner creates a new headers scanner
-func NewHeadersScanner(target string) *HeadersScanner {
+func NewHeadersScanner(target string, subtype string) *HeadersScanner {
 	return &HeadersScanner{
-		Target: target,
-		Client: &http.Client{Timeout: 10 * time.Second},
+		Target:  target,
+		Client:  &http.Client{Timeout: 10 * time.Second},
+		Subtype: normalizeSubtype(subtype),
 	}
 }
 
@@ -40,21 +42,35 @@ func (s *HeadersScanner) Run() {
 	}
 	defer resp.Body.Close()
 
-	s.checkHeader(resp, "Content-Security-Policy", "Missing CSP")
-	s.checkHeader(resp, "Strict-Transport-Security", "Missing HSTS")
-	s.checkHeader(resp, "X-Frame-Options", "Missing XFO (Clickjacking risk)")
-	s.checkHeader(resp, "X-Content-Type-Options", "Missing XCTO (MIME sniffing risk)")
-	s.checkHeader(resp, "Referrer-Policy", "Missing Referrer-Policy")
-	s.checkHeader(resp, "Permissions-Policy", "Missing Permissions-Policy")
-	s.checkHeader(resp, "Cross-Origin-Opener-Policy", "Missing COOP")
-	s.checkHeader(resp, "Cross-Origin-Resource-Policy", "Missing CORP")
+	switch s.Subtype {
+	case "transport_policy":
+		s.checkHeader(resp, "Strict-Transport-Security", "Missing HSTS")
+		s.checkHeader(resp, "Cross-Origin-Opener-Policy", "Missing COOP")
+		s.checkHeader(resp, "Cross-Origin-Resource-Policy", "Missing CORP")
+	case "legacy_headers":
+		s.checkHeader(resp, "X-Frame-Options", "Missing XFO (Clickjacking risk)")
+		s.checkHeader(resp, "X-Content-Type-Options", "Missing XCTO (MIME sniffing risk)")
+	default: // browser_policy and fallback
+		s.checkHeader(resp, "Content-Security-Policy", "Missing CSP")
+		s.checkHeader(resp, "Strict-Transport-Security", "Missing HSTS")
+		s.checkHeader(resp, "X-Frame-Options", "Missing XFO (Clickjacking risk)")
+		s.checkHeader(resp, "X-Content-Type-Options", "Missing XCTO (MIME sniffing risk)")
+		s.checkHeader(resp, "Referrer-Policy", "Missing Referrer-Policy")
+		s.checkHeader(resp, "Permissions-Policy", "Missing Permissions-Policy")
+		s.checkHeader(resp, "Cross-Origin-Opener-Policy", "Missing COOP")
+		s.checkHeader(resp, "Cross-Origin-Resource-Policy", "Missing CORP")
+	}
 
-	s.checkHeaderPolicy(resp, "X-Content-Type-Options", []string{"nosniff"}, "Header should be set to nosniff")
-	s.checkHeaderPolicy(resp, "X-Frame-Options", []string{"deny", "sameorigin"}, "Header should be DENY or SAMEORIGIN")
-	s.checkHeaderPolicy(resp, "Referrer-Policy", []string{"strict-origin-when-cross-origin", "no-referrer", "same-origin"}, "Header should use a restrictive referrer policy")
-	s.checkCSPPolicy(resp)
+	if s.Subtype != "transport_policy" {
+		s.checkHeaderPolicy(resp, "X-Content-Type-Options", []string{"nosniff"}, "Header should be set to nosniff")
+		s.checkHeaderPolicy(resp, "X-Frame-Options", []string{"deny", "sameorigin"}, "Header should be DENY or SAMEORIGIN")
+		s.checkHeaderPolicy(resp, "Referrer-Policy", []string{"strict-origin-when-cross-origin", "no-referrer", "same-origin"}, "Header should use a restrictive referrer policy")
+		s.checkCSPPolicy(resp)
+	}
 	s.checkHSTS(resp)
-	s.checkCookieFlags(resp)
+	if s.Subtype != "legacy_headers" {
+		s.checkCookieFlags(resp)
+	}
 
 	// Check for Server header (Information Disclosure)
 	server := resp.Header.Get("Server")

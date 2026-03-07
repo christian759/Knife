@@ -48,6 +48,7 @@ type CmdInjScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // cmdInjCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type cmdInjCrawlJob struct {
 	Depth int
 }
 
-func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*CmdInjScanner, error) {
+func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*CmdInjScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle ti
 	}
 
 	payloads := generateCmdInjPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterCmdInjPayloads(payloads, subtype)
 
 	s := &CmdInjScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewCmdInjScanner(start string, workers, maxPages, maxDepth int, throttle ti
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterCmdInjPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "shell_metachar":
+			if containsAnyFold(p, ";", "|", "&&", "`", "$(") && !containsAnyFold(p, "sleep", "ping -c 5") {
+				out = append(out, p)
+			}
+		case "blind_timing":
+			if containsAnyFold(p, "sleep", "ping -c 5", "timeout") {
+				out = append(out, p)
+			}
+		case "oob_dns":
+			if containsAnyFold(p, "nslookup", "dig", "curl", "wget") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -226,7 +259,7 @@ func (s *CmdInjScanner) fuzzURL(rawURL string) {
 			}
 
 			// Time-based detection (Intensity > 3)
-			if s.Intensity > 3 && strings.Contains(payload, "sleep") {
+			if s.Intensity > 3 && (s.Subtype == "" || s.Subtype == "blind_timing") && strings.Contains(payload, "sleep") {
 				if duration >= 5*time.Second {
 					s.addFinding(FindingCmdInj{
 						Type:            "Blind Command Injection (Time-based)",
@@ -376,7 +409,7 @@ func (s *CmdInjScanner) normalize(base, href string) (string, error) {
 func RunCmdInjScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Command Injection Scanner on", target)
 
-	scanner, err := NewCmdInjScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
+	scanner, err := NewCmdInjScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil, "shell_metachar")
 	if err != nil {
 		return err
 	}

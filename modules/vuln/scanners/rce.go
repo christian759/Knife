@@ -48,6 +48,7 @@ type RCEScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // rceCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type rceCrawlJob struct {
 	Depth int
 }
 
-func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*RCEScanner, error) {
+func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*RCEScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 	}
 
 	payloads := generateRCEPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterRCEPayloads(payloads, subtype)
 
 	s := &RCEScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewRCEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterRCEPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "template_injection":
+			if containsAnyFold(p, "{{", "${7*7}", "<%= 7*7 %>", "7*7") {
+				out = append(out, p)
+			}
+		case "deserialization":
+			if containsAnyFold(p, "java.lang", "object", "serialize", "@type", "o:") {
+				out = append(out, p)
+			}
+		case "runtime_eval":
+			if containsAnyFold(p, "system(", "exec(", "shell_exec", "passthru", "`id`", "__import__", "runtime.getruntime") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -227,7 +260,7 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 			// Time-based blind RCE (SSTI/PHP etc)
 			if s.Intensity > 3 && (strings.Contains(payload, "sleep") || strings.Contains(payload, "7*7")) {
 				// For math-based SSTI
-				if strings.Contains(bodyStr, "49") {
+				if (s.Subtype == "" || s.Subtype == "template_injection") && strings.Contains(bodyStr, "49") {
 					s.addFinding(FindingRCE{
 						Type:            "Server-Side Template Injection (SSTI)",
 						URL:             testURL,
@@ -238,7 +271,7 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 					})
 				}
 				// For time-based
-				if duration >= 5*time.Second {
+				if (s.Subtype == "" || s.Subtype == "runtime_eval") && duration >= 5*time.Second {
 					s.addFinding(FindingRCE{
 						Type:            "Blind RCE (Time-based)",
 						URL:             testURL,
@@ -254,6 +287,7 @@ func (s *RCEScanner) fuzzURL(rawURL string) {
 }
 
 func (s *RCEScanner) detectRCE(body string) (string, bool) {
+	subtype := normalizeSubtype(s.Subtype)
 	signatures := []struct {
 		Pattern *regexp.Regexp
 		Name    string
@@ -266,6 +300,12 @@ func (s *RCEScanner) detectRCE(body string) (string, bool) {
 	}
 
 	for _, sig := range signatures {
+		if subtype == "template_injection" && !containsAnyFold(sig.Name, "php", "runtime", "id command", "version") {
+			continue
+		}
+		if subtype == "runtime_eval" && !containsAnyFold(sig.Name, "id command", "php", "passwd") {
+			continue
+		}
 		if sig.Pattern.MatchString(body) {
 			match := sig.Pattern.FindString(body)
 			return fmt.Sprintf("Matched signature: %s (%s)", sig.Name, match), true
@@ -378,7 +418,7 @@ func (s *RCEScanner) normalize(base, href string) (string, error) {
 func RunRCEScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting RCE Scanner on", target)
 
-	scanner, err := NewRCEScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
+	scanner, err := NewRCEScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil, "runtime_eval")
 	if err != nil {
 		return err
 	}

@@ -141,9 +141,10 @@ func (sc *ScannerCoordinator) runScanner(scannerType ScannerType) (int, error) {
 // SQL Scanner
 func (sc *ScannerCoordinator) runSQLScanner() error {
 	intensity := sc.modeIntensity(ScannerSQL)
+	subtype := sc.scannerSubtype(ScannerSQL, "error_based")
 	scanner, err := scanners.NewSQLScanner(sc.config.Target, sc.config.Workers,
 		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle,
-		intensity, sc.mergePayloads(ScannerSQL, "sql"))
+		intensity, sc.mergePayloads(ScannerSQL, "sql"), subtype)
 	if err != nil {
 		return err
 	}
@@ -161,7 +162,7 @@ func (sc *ScannerCoordinator) runSQLScanner() error {
 
 // Headers Scanner
 func (sc *ScannerCoordinator) runHeadersScanner() error {
-	scanner := scanners.NewHeadersScanner(sc.config.Target)
+	scanner := scanners.NewHeadersScanner(sc.config.Target, sc.scannerSubtype(ScannerHeaders, "browser_policy"))
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertHeaderFinding(f))
@@ -172,7 +173,7 @@ func (sc *ScannerCoordinator) runHeadersScanner() error {
 
 // Files Scanner
 func (sc *ScannerCoordinator) runFilesScanner() error {
-	scanner := scanners.NewFilesScanner(sc.config.Target)
+	scanner := scanners.NewFilesScanner(sc.config.Target, sc.scannerSubtype(ScannerFiles, "backup_files"))
 	scanner.Run()
 	for _, f := range scanner.Findings {
 		sc.addFinding(ConvertFileFinding(f))
@@ -420,7 +421,7 @@ func (sc *ScannerCoordinator) runXSSScanner() error {
 	useChrome := subtype == "dom" || subtype == "full"
 	scanner, err := scanners.NewScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages,
 		sc.config.MaxDepth, intensity, useChrome, sc.config.Throttle,
-		sc.mergePayloads(ScannerXSS, "xss"))
+		sc.mergePayloads(ScannerXSS, "xss"), subtype)
 	if err != nil {
 		return err
 	}
@@ -447,7 +448,7 @@ func (sc *ScannerCoordinator) runCSRFScanner() error {
 		}
 	}
 	scanner, err := scanners.NewCSRFScanner(sc.config.Target, sc.config.Workers,
-		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, intensity, sc.config.TargetedCVEs)
+		sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, intensity, sc.config.TargetedCVEs, subtype)
 	if err != nil {
 		return err
 	}
@@ -465,7 +466,7 @@ func (sc *ScannerCoordinator) runCSRFScanner() error {
 
 // LFI Scanner
 func (sc *ScannerCoordinator) runLFIScanner() error {
-	scanner, err := scanners.NewLFIScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerLFI), sc.config.TargetedCVEs, sc.mergePayloads(ScannerLFI, "lfi"))
+	scanner, err := scanners.NewLFIScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerLFI), sc.config.TargetedCVEs, sc.mergePayloads(ScannerLFI, "lfi"), sc.scannerSubtype(ScannerLFI, "path_traversal"))
 	if err != nil {
 		return err
 	}
@@ -479,7 +480,7 @@ func (sc *ScannerCoordinator) runLFIScanner() error {
 
 // SSRF Scanner
 func (sc *ScannerCoordinator) runSSRFScanner() error {
-	scanner, err := scanners.NewSSRFScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerSSRF), sc.config.TargetedCVEs, sc.mergePayloads(ScannerSSRF, "ssrf"))
+	scanner, err := scanners.NewSSRFScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerSSRF), sc.config.TargetedCVEs, sc.mergePayloads(ScannerSSRF, "ssrf"), sc.scannerSubtype(ScannerSSRF, "metadata"))
 	if err != nil {
 		return err
 	}
@@ -493,7 +494,7 @@ func (sc *ScannerCoordinator) runSSRFScanner() error {
 
 // Command Injection Scanner
 func (sc *ScannerCoordinator) runCommandInjectionScanner() error {
-	scanner, err := scanners.NewCmdInjScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerCommandInjection), sc.config.TargetedCVEs, sc.mergePayloads(ScannerCommandInjection, "command_injection"))
+	scanner, err := scanners.NewCmdInjScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerCommandInjection), sc.config.TargetedCVEs, sc.mergePayloads(ScannerCommandInjection, "command_injection"), sc.scannerSubtype(ScannerCommandInjection, "shell_metachar"))
 	if err != nil {
 		return err
 	}
@@ -507,7 +508,7 @@ func (sc *ScannerCoordinator) runCommandInjectionScanner() error {
 
 // RCE Scanner
 func (sc *ScannerCoordinator) runRCEScanner() error {
-	scanner, err := scanners.NewRCEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerRCE), sc.config.TargetedCVEs, sc.mergePayloads(ScannerRCE, "rce"))
+	scanner, err := scanners.NewRCEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerRCE), sc.config.TargetedCVEs, sc.mergePayloads(ScannerRCE, "rce"), sc.scannerSubtype(ScannerRCE, "runtime_eval"))
 	if err != nil {
 		return err
 	}
@@ -521,7 +522,7 @@ func (sc *ScannerCoordinator) runRCEScanner() error {
 
 // Directory Traversal Scanner
 func (sc *ScannerCoordinator) runDirectoryTraversalScanner() error {
-	scanner, err := scanners.NewTraversalScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerDirectoryTraversal), sc.config.TargetedCVEs, sc.mergePayloads(ScannerDirectoryTraversal, "directory_traversal"))
+	scanner, err := scanners.NewTraversalScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerDirectoryTraversal), sc.config.TargetedCVEs, sc.mergePayloads(ScannerDirectoryTraversal, "directory_traversal"), sc.scannerSubtype(ScannerDirectoryTraversal, "dotdot_slash"))
 	if err != nil {
 		return err
 	}
@@ -535,7 +536,7 @@ func (sc *ScannerCoordinator) runDirectoryTraversalScanner() error {
 
 // XXE Scanner
 func (sc *ScannerCoordinator) runXXEScanner() error {
-	scanner, err := scanners.NewXXEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerXXE), sc.config.TargetedCVEs, sc.mergePayloads(ScannerXXE, "xxe"))
+	scanner, err := scanners.NewXXEScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerXXE), sc.config.TargetedCVEs, sc.mergePayloads(ScannerXXE, "xxe"), sc.scannerSubtype(ScannerXXE, "file_disclosure"))
 	if err != nil {
 		return err
 	}
@@ -549,7 +550,7 @@ func (sc *ScannerCoordinator) runXXEScanner() error {
 
 // Open Redirect Scanner
 func (sc *ScannerCoordinator) runOpenRedirectScanner() error {
-	scanner, err := scanners.NewRedirectScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerOpenRedirect), sc.config.TargetedCVEs, sc.mergePayloads(ScannerOpenRedirect, "open_redirect"))
+	scanner, err := scanners.NewRedirectScanner(sc.config.Target, sc.config.Workers, sc.config.MaxPages, sc.config.MaxDepth, sc.config.Throttle, sc.modeIntensity(ScannerOpenRedirect), sc.config.TargetedCVEs, sc.mergePayloads(ScannerOpenRedirect, "open_redirect"), sc.scannerSubtype(ScannerOpenRedirect, "query_redirect"))
 	if err != nil {
 		return err
 	}

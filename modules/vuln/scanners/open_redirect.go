@@ -45,6 +45,7 @@ type RedirectScanner struct {
 	TargetedCVEs []string
 	Payloads     []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // redirectCrawlJob represents a URL to be scanned
@@ -53,7 +54,7 @@ type redirectCrawlJob struct {
 	Depth int
 }
 
-func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*RedirectScanner, error) {
+func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*RedirectScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle 
 	}
 
 	payloads := generateRedirectPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterRedirectPayloads(payloads, subtype)
 
 	s := &RedirectScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewRedirectScanner(start string, workers, maxPages, maxDepth int, throttle 
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterRedirectPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "query_redirect":
+			if containsAnyFold(p, "http://", "https://", "//") {
+				out = append(out, p)
+			}
+		case "path_redirect":
+			if containsAnyFold(p, "/%09/", "/%5c/", "//") {
+				out = append(out, p)
+			}
+		case "double_encoding":
+			if containsAnyFold(p, "%2e", "%0d%0a", "@", "http:evil") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -252,13 +285,23 @@ func (s *RedirectScanner) isExternalRedirect(loc, payload string) bool {
 	// Basic check: does the location contain our payload's domain?
 	// Our payloads usually target "evil.com" or "google.com"
 
+	subtype := normalizeSubtype(s.Subtype)
+
 	// If the payload was fully injected into the Location header
 	if strings.Contains(loc, "evil.com") || strings.Contains(loc, "google.com") {
 		return true
 	}
 
 	// If the payload was "javascript:alert(1)"
-	if strings.HasPrefix(strings.ToLower(loc), "javascript:") {
+	if strings.HasPrefix(strings.ToLower(loc), "javascript:") && (subtype == "" || subtype == "query_redirect") {
+		return true
+	}
+
+	if subtype == "path_redirect" && strings.HasPrefix(loc, "//") {
+		return true
+	}
+
+	if subtype == "double_encoding" && containsAnyFold(loc, "%2f%2f", "%252f", "%0d", "%0a") {
 		return true
 	}
 
@@ -365,7 +408,7 @@ func (s *RedirectScanner) normalize(base, href string) (string, error) {
 func RunRedirectScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Open Redirect Scanner on", target)
 
-	scanner, err := NewRedirectScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
+	scanner, err := NewRedirectScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil, "query_redirect")
 	if err != nil {
 		return err
 	}

@@ -28,11 +28,12 @@ type FilesScanner struct {
 	Client   *http.Client
 	Findings []FindingFile
 	Paths    []string
+	Subtype  string
 }
 
 // NewFilesScanner creates a new sensitive files scanner
-func NewFilesScanner(target string) *FilesScanner {
-	return &FilesScanner{
+func NewFilesScanner(target string, subtype string) *FilesScanner {
+	s := &FilesScanner{
 		Target: target,
 		Client: &http.Client{
 			Timeout: 10 * time.Second,
@@ -40,6 +41,7 @@ func NewFilesScanner(target string) *FilesScanner {
 				return http.ErrUseLastResponse // Don't follow redirects to avoid false positives
 			},
 		},
+		Subtype: normalizeSubtype(subtype),
 		Paths: []string{
 			".git/config",
 			".git/HEAD",
@@ -91,6 +93,15 @@ func NewFilesScanner(target string) *FilesScanner {
 			".DS_Store",
 		},
 	}
+	switch s.Subtype {
+	case "backup_files":
+		s.Paths = []string{"backup.sql", "dump.sql", "database.sql", "db.sql", "config.php.bak", "wp-config.php.bak", ".env.backup"}
+	case "config_leaks":
+		s.Paths = []string{".env", ".env.local", ".env.production", "config.php", "config.json", "appsettings.json", "application.properties", "application.yml", "web.config"}
+	case "admin_artifacts":
+		s.Paths = []string{"server-status", "server-info", "swagger.json", "openapi.json", "phpinfo.php", "info.php", ".well-known/security.txt"}
+	}
+	return s
 }
 
 // Run executes the sensitive files scan

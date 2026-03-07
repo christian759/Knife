@@ -48,6 +48,7 @@ type XXEScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // xxeCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type xxeCrawlJob struct {
 	Depth int
 }
 
-func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*XXEScanner, error) {
+func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*XXEScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 	}
 
 	payloads := generateXXEPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterXXEPayloads(payloads, subtype)
 
 	s := &XXEScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewXXEScanner(start string, workers, maxPages, maxDepth int, throttle time.
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterXXEPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "file_disclosure":
+			if containsAnyFold(p, "file://", "/etc/passwd", "win.ini", "php://filter") {
+				out = append(out, p)
+			}
+		case "ssrf_entities":
+			if containsAnyFold(p, "http://", "https://", "remote", "oob") {
+				out = append(out, p)
+			}
+		case "billion_laughs":
+			if containsAnyFold(p, "!entity", "lol", "expand", "billion") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -262,6 +295,7 @@ func (s *XXEScanner) fuzzURL(rawURL string) {
 }
 
 func (s *XXEScanner) detectXXE(body string) (string, bool) {
+	subtype := normalizeSubtype(s.Subtype)
 	signatures := []struct {
 		Pattern *regexp.Regexp
 		Name    string
@@ -273,6 +307,12 @@ func (s *XXEScanner) detectXXE(body string) (string, bool) {
 	}
 
 	for _, sig := range signatures {
+		if subtype == "file_disclosure" && !containsAnyFold(sig.Name, "passwd", "win.ini", "boot.ini", "file") {
+			continue
+		}
+		if subtype == "ssrf_entities" && !containsAnyFold(sig.Name, "java", "file not found") {
+			continue
+		}
 		if sig.Pattern.MatchString(body) {
 			match := sig.Pattern.FindString(body)
 			return fmt.Sprintf("Matched signature: %s (%s)", sig.Name, match), true

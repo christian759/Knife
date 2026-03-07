@@ -48,6 +48,7 @@ type TraversalScanner struct {
 	Intensity    int
 	TargetedCVEs []string
 	Throttle     time.Duration
+	Subtype      string
 }
 
 // traversalCrawlJob represents a URL to be scanned
@@ -56,7 +57,7 @@ type traversalCrawlJob struct {
 	Depth int
 }
 
-func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string) (*TraversalScanner, error) {
+func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle time.Duration, intensity int, targetedCVEs []string, customPayloads []string, subtype string) (*TraversalScanner, error) {
 	parsed, err := url.Parse(start)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,8 @@ func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle
 	}
 
 	payloads := generateTraversalPayloads(intensity, targetedCVEs, customPayloads)
+	subtype = normalizeSubtype(subtype)
+	payloads = filterTraversalPayloads(payloads, subtype)
 
 	s := &TraversalScanner{
 		StartURL:     parsed,
@@ -80,8 +83,38 @@ func NewTraversalScanner(start string, workers, maxPages, maxDepth int, throttle
 		Payloads:     payloads,
 		Intensity:    intensity,
 		TargetedCVEs: targetedCVEs,
+		Subtype:      subtype,
 	}
 	return s, nil
+}
+
+func filterTraversalPayloads(payloads []string, subtype string) []string {
+	if subtype == "" {
+		return payloads
+	}
+	out := make([]string, 0, len(payloads))
+	for _, p := range payloads {
+		switch subtype {
+		case "dotdot_slash":
+			if containsAnyFold(p, "../", "/etc/passwd", "win.ini") {
+				out = append(out, p)
+			}
+		case "encoded_bypass":
+			if containsAnyFold(p, "%2f", "%252f", "%2e%2e") {
+				out = append(out, p)
+			}
+		case "windows_paths":
+			if containsAnyFold(p, "\\", "windows", "win.ini", "boot.ini", "%5c") {
+				out = append(out, p)
+			}
+		default:
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return payloads
+	}
+	return dedupeStrings(out)
 }
 
 // Run starts the scanning process
@@ -229,6 +262,7 @@ func (s *TraversalScanner) fuzzURL(rawURL string) {
 }
 
 func (s *TraversalScanner) detectTraversal(body string) (string, bool) {
+	subtype := normalizeSubtype(s.Subtype)
 	signatures := []struct {
 		Pattern *regexp.Regexp
 		Name    string
@@ -240,6 +274,12 @@ func (s *TraversalScanner) detectTraversal(body string) (string, bool) {
 	}
 
 	for _, sig := range signatures {
+		if subtype == "windows_paths" && !containsAnyFold(sig.Name, "win.ini", "boot.ini") {
+			continue
+		}
+		if subtype == "dotdot_slash" && !containsAnyFold(sig.Name, "passwd", "directory listing") {
+			continue
+		}
 		if sig.Pattern.MatchString(body) {
 			match := sig.Pattern.FindString(body)
 			return fmt.Sprintf("Matched signature: %s (%s)", sig.Name, match), true
@@ -349,7 +389,7 @@ func (s *TraversalScanner) normalize(base, href string) (string, error) {
 func RunTraversalScan(target string, headers map[string]string, cookies string, reportPath string) error {
 	fmt.Println("[*] Starting Directory Traversal Scanner on", target)
 
-	scanner, err := NewTraversalScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil)
+	scanner, err := NewTraversalScanner(target, 10, 100, 3, 200*time.Millisecond, 3, nil, nil, "dotdot_slash")
 	if err != nil {
 		return err
 	}
