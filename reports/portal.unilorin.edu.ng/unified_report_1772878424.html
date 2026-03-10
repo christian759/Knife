@@ -1,0 +1,351 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>Comprehensive Vulnerability Scan Report</title>
+		<style>
+			* { margin: 0; padding: 0; box-sizing: border-box; }
+			body { 
+				font-family: 'Courier New', Courier, monospace; 
+				background: #0d0208;
+				color: #00ff41;
+				padding: 20px;
+				min-height: 100vh;
+			}
+			.container {
+				max-width: 1200px;
+				margin: 0 auto;
+				background: #000;
+				border: 1px solid #00ff41;
+				border-radius: 4px;
+				box-shadow: 0 0 20px #00ff4155;
+				overflow: hidden;
+			}
+			.header {
+				background: #000;
+				border-bottom: 2px solid #ff0000;
+				color: #ff0000;
+				padding: 40px;
+				text-align: center;
+				text-transform: uppercase;
+				letter-spacing: 4px;
+			}
+			.header h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 0 0 10px #ff000055; }
+			.header p { opacity: 0.9; font-size: 1.1em; color: #00ff41; }
+			.summary {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 20px;
+				padding: 30px 40px;
+				background: #050505;
+				border-bottom: 1px solid #00ff41;
+			}
+			.summary-card {
+				background: #000;
+				padding: 20px;
+				border: 1px solid #00ff41;
+				border-radius: 4px;
+				text-align: center;
+				transition: all 0.2s;
+			}
+			.summary-card:hover { border-color: #ff0000; box-shadow: 0 0 10px #ff000055; }
+			.summary-card h3 { font-size: 2.5em; margin-bottom: 5px; }
+			.summary-card p { color: #00ff41; font-size: 0.9em; text-transform: uppercase; }
+			.critical { color: #ff0000; border-color: #ff0000 !important; }
+			.high { color: #e67e22; }
+			.medium { color: #f1c40f; }
+			.low { color: #3498db; }
+			.findings {
+				padding: 40px;
+			}
+			.finding-card {
+				background: #050505;
+				border: 1px solid #00ff41;
+				padding: 25px;
+				margin-bottom: 30px;
+				box-shadow: 5px 5px 0px #00ff4122;
+			}
+			.finding-card.severity-Critical { border-color: #ff0000; box-shadow: 5px 5px 0px #ff000022; }
+			.finding-card.severity-High { border-color: #e67e22; }
+			.finding-card.severity-Medium { border-color: #f1c40f; }
+			.finding-card.severity-Low { border-color: #3498db; }
+			.finding-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 20px;
+				border-bottom: 1px solid #333;
+				padding-bottom: 10px;
+			}
+			.finding-title { font-size: 1.6em; color: #ff0000; font-weight: bold; }
+			.severity-badge {
+				padding: 4px 12px;
+				border-radius: 2px;
+				font-weight: bold;
+				font-size: 0.8em;
+				text-transform: uppercase;
+				border: 1px solid;
+			}
+			.severity-badge.Critical { color: #ff0000; border-color: #ff0000; }
+			.severity-badge.High { color: #e67e22; border-color: #e67e22; }
+			.severity-badge.Medium { color: #f1c40f; border-color: #f1c40f; }
+			.severity-badge.Low { color: #3498db; border-color: #3498db; }
+			.finding-details { margin: 15px 0; font-size: 0.95em; }
+			.detail-row {
+				display: grid;
+				grid-template-columns: 200px 1fr;
+				padding: 10px 0;
+				border-bottom: 1px solid #111;
+			}
+			.detail-label { font-weight: bold; color: #00ff41; opacity: 0.7; text-transform: uppercase; }
+			.detail-value { color: #00ff41; word-break: break-all; }
+			.evidence {
+				background: #000;
+				border: 1px dashed #00ff41;
+				padding: 15px;
+				font-family: 'Courier New', monospace;
+				white-space: pre-wrap;
+				overflow-x: auto;
+				margin-top: 15px;
+				font-size: 0.9em;
+				color: #00ff41;
+			}
+			.section-title {
+				font-size: 1.1em;
+				color: #ff0000;
+				margin-bottom: 8px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+			}
+			footer {
+				text-align: center;
+				padding: 40px;
+				background: #050505;
+				color: #444;
+				font-size: 0.8em;
+				border-top: 1px solid #111;
+			}
+			.timestamp { color: #333; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<h1>🔐 Vulnerability Scan Report</h1>
+				<p>Target: portal.unilorin.edu.ng</p>
+				<p>Generated: 07 Mar 2026 11:13:44 WAT</p>
+			</div>
+			
+			<div class="summary">
+				<div class="summary-card">
+					<h3>4</h3>
+					<p>Total Findings</p>
+				</div>
+				<div class="summary-card critical">
+					<h3>0</h3>
+					<p>Critical</p>
+				</div>
+				<div class="summary-card high">
+					<h3>1</h3>
+					<p>High</p>
+				</div>
+				<div class="summary-card medium">
+					<h3>3</h3>
+					<p>Medium</p>
+				</div>
+				<div class="summary-card low">
+					<h3>0</h3>
+					<p>Low</p>
+				</div>
+			</div>
+			
+			<div class="findings">
+				
+				
+				
+				<div class="finding-card severity-High">
+					<div class="finding-header">
+						<div class="finding-title">1. Priv-Esc Path: 22 (SSH)</div>
+						<span class="severity-badge High">High</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:22</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 11:13:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp banner=SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12 | SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12 | SSH endpoint detected risk=High (remote administration exposed) recommendation=Restrict administration interfaces to VPN/jump-host and enforce MFA/allowlists. priv_esc_path=true category=remote-admin</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">2. Open Port: 25 (SMTP)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:25</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 11:13:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp risk=Medium (legacy/auth-sensitive service exposed) recommendation=Confirm business need, then firewall or disable if unnecessary. category=network-service</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">3. Open Port: 80 (HTTP)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:80</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 11:13:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp risk=Medium (web attack surface exposed) recommendation=Run authenticated web testing and verify patch/WAF/TLS posture. category=web</div>
+					
+				</div>
+				
+				
+				<div class="finding-card severity-Medium">
+					<div class="finding-header">
+						<div class="finding-title">4. Open Port: 443 (HTTPS)</div>
+						<span class="severity-badge Medium">Medium</span>
+					</div>
+					
+					<div class="finding-details">
+						<div class="detail-row">
+							<div class="detail-label">Type:</div>
+							<div class="detail-value">Network Service</div>
+						</div>
+						<div class="detail-row">
+							<div class="detail-label">URL:</div>
+							<div class="detail-value"><a href="#ZgotmplZ">46.51.155.245:443</a></div>
+						</div>
+						
+						
+						
+						
+						<div class="detail-row">
+							<div class="detail-label">Discovered:</div>
+							<div class="detail-value">2026-03-07 11:13:44</div>
+						</div>
+					</div>
+					
+					<div class="section-title">What This Means</div>
+					<p>Exposed network services increase attack surface and can provide direct footholds into application and infrastructure layers.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How Attackers Could Exploit It</div>
+					<p>Attackers can pivot from exposed web/management/data services to lateral movement, credential theft, and privilege escalation.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Investigate Further</div>
+					<p>Validate each exposed service owner and purpose, then confirm if access is intentionally public or should be limited to trusted networks.</p>
+					
+					<div class="section-title" style="margin-top: 20px;">How to Fix</div>
+					<p>Restrict exposed ports with firewall rules, enforce authentication and encryption, and remove unnecessary internet-facing services.</p>
+					
+					
+					<div class="section-title" style="margin-top: 20px;">Evidence</div>
+					<div class="evidence">status=open protocol=tcp banner=HTTP status=400 server=nginx risk=Medium (web attack surface exposed) recommendation=Run authenticated web testing and verify patch/WAF/TLS posture. category=web</div>
+					
+				</div>
+				
+				
+			</div>
+			
+			<footer>
+				Generated by <strong>Knife Vulnerability Scanner</strong> — for ethical and educational use only.<br>
+				Learn. Investigate. Protect.
+			</footer>
+		</div>
+	</body>
+</html>
